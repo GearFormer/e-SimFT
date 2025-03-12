@@ -1,0 +1,24 @@
+# Ignore compiled Python files
+*.pyc
+
+# Ignore the build directory
+/build/
+*/__pycache__/
+__pycache__/
+
+/experiments/
+.vscode/
+.idea/
+
+*.pickle
+*.pkl
+*.csv
+*.h5
+*.dict
+!/train_models/models/GearFormer_0.0001_18_encoder.dict
+!/train_models/models/GearFormer_0.0001_18_decoder.dict
+
+/gearformer_model/log.txt
+
+*.png
+*.pdf
