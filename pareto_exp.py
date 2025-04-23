@@ -29,108 +29,6 @@ max_length = 21
 get_dict = load_data(args)
 input_size = 8
 
-def crowding_distance(points):
-    """
-    Compute crowding distance for a set of Pareto-optimal points.
-    
-    :param points: (N, d) NumPy array where N is the number of points and d is the number of objectives.
-    :return: Crowding distances for each point.
-    """
-    N, d = points.shape
-    distances = np.zeros(N)
-
-    for i in range(d):  # Iterate over each objective
-        sorted_indices = np.argsort(points[:, i])
-        sorted_points = points[sorted_indices, i]
-
-        # Assign a large distance to boundary points
-        distances[sorted_indices[0]] = np.inf
-        distances[sorted_indices[-1]] = np.inf
-
-        # Compute distances for middle points
-        for j in range(1, N - 1):
-            distances[sorted_indices[j]] += (sorted_points[j + 1] - sorted_points[j - 1])
-
-    return distances
-
-def spread_metric(pareto_points):
-    pareto_points = np.array(pareto_points)
-    pareto_points = pareto_points[np.argsort(pareto_points[:, 0])]  # Sort by first objective
-    
-    distances = np.linalg.norm(np.diff(pareto_points, axis=0), axis=1)  # Euclidean distances
-    d_f = np.linalg.norm(pareto_points[0] - pareto_points[-1])  # Distance between extremes
-    mean_d = np.mean(distances)
-    
-    delta = (d_f + np.sum(np.abs(distances - mean_d))) / (d_f + (len(distances) * mean_d))
-    return delta
-
-def pareto_frontier(points):
-    """
-    Find the Pareto frontier (set of Pareto-optimal points).
-    
-    :param points: A NumPy array where each row is a point (obj1, obj2, obj3)
-    :return: A set containing the Pareto-optimal points (as tuples)
-    """
-    pareto_set = set()
-    num_points = points.shape[0]
-    
-    for i in range(num_points):
-        dominated = False
-        for j in range(num_points):
-            if all(points[j] <= points[i]) and any(points[j] < points[i]):  # Strict domination check
-                dominated = True
-                break
-        if not dominated:
-            pareto_set.add(tuple(points[i]))  # Convert to tuple for set operations
-    
-    return list(pareto_set)
-
-def plot_objective_pairs(pairs, pareto_points, fname, title="Objective Value Pairs", xlabel="Objective 1", ylabel="Objective 2"):
-    """
-    Plots a list of objective value pairs on a scatter plot with optional title and axis labels.
-
-    Parameters:
-        pairs (list of tuple): List of objective value pairs [(x1, y1), (x2, y2), ...].
-        title (str): Title of the plot.
-        xlabel (str): Label for the x-axis.
-        ylabel (str): Label for the y-axis.
-    """
-    # Extract x and y values from pairs
-
-    x_values = []
-    po_x_values = []
-    y_values = []
-    po_y_values = []
-
-    for pair in pairs:
-        if pair in pareto_points:
-            po_x_values.append(pair[0])
-            po_y_values.append(pair[1])
-        else:
-            x_values.append(pair[0])
-            y_values.append(pair[1])
-
-    # Create the plot
-    plt.figure(figsize=(8, 6))
-    plt.scatter(x_values, y_values, color='blue', s=25)
-    plt.scatter(po_x_values, po_y_values, color='red', s=25, label='Pareto optimal')
-
-    # Adding labels and title
-    plt.title(title)
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
-
-    ax = plt.gca()
-    ax.set_xlim([0, 0.3])
-    ax.set_ylim([0, 0.8])
-
-    # Add grid and legend
-    plt.grid(alpha=0.5)
-    plt.legend()
-
-    # Show the plot
-    plt.savefig(fname)
-    plt.close()
 
 class GFModel:
 
@@ -274,7 +172,7 @@ class GFModel_obj2:
                     # out_inx_batch.append([0] + out_inx[i].long().tolist())
 
         return out_seq_batch
-    
+
 class GFModel_w:
 
     def __init__(self, encoder_name, decoder_name, obj_encoder_name, w_encoder_name):
@@ -330,6 +228,28 @@ class GFModel_w:
 
         return out_seq_batch
     
+
+def pareto_frontier(points):
+    """
+    Find the Pareto frontier (set of Pareto-optimal points).
+    
+    :param points: A NumPy array where each row is a point (obj1, obj2, obj3)
+    :return: A set containing the Pareto-optimal points (as tuples)
+    """
+    pareto_set = set()
+    num_points = points.shape[0]
+    
+    for i in range(num_points):
+        dominated = False
+        for j in range(num_points):
+            if all(points[j] <= points[i]) and any(points[j] < points[i]):  # Strict domination check
+                dominated = True
+                break
+        if not dominated:
+            pareto_set.add(tuple(points[i]))  # Convert to tuple for set operations
+    
+    return list(pareto_set)
+
 
 def calculate_volume(min_corner, max_corner):
     # Unpack the corners
@@ -482,162 +402,9 @@ def find_obj_triples(sim_results, req_input, scenario):
 
     return obj_trips
 
-def eval_paretos(ref_point, results, scenario, method1, method2):
-
-    print("Scenario: ", scenario, "\n")
-    
-    hv_indicator = HV(ref_point=ref_point)
-    hv1 = []
-    hv2 = []
-    spread1 = []
-    spread2 = []
-    no_p1 = []
-    no_p2 = []
-
-    for i in range(num_tests):
-        hv1.append(hv_indicator(results[scenario][method1]["pareto"][i]))
-        hv2.append(hv_indicator(results[scenario][method2]["pareto"][i]))
-
-        no_p1.append(results[scenario][method1]["no_pareto"][i])
-        no_p2.append(results[scenario][method2]["no_pareto"][i])
-
-        spread1.append(spread_metric(results[scenario][method1]["pareto"][i]))
-        spread2.append(spread_metric(results[scenario][method2]["pareto"][i]))
-
-    print("Hypervolume")
-    print(np.mean(hv1), np.std(hv1))
-    print(np.mean(hv2), np.std(hv2))
-    print(ttest_ind(hv1, hv2))
-    print()
-
-    print("No of points")
-    print(np.mean(no_p1), np.std(no_p1))
-    print(np.mean(no_p2), np.std(no_p2))
-    print(ttest_ind(no_p1, no_p2))
-    print()
-
-    # print("Spread")
-    # print(np.mean(spread1), np.std(spread1))
-    # print(np.mean(spread2), np.std(spread2))
-    # print(ttest_ind(spread1, spread2))
-    # print()
-
-def normalize(x, min, max):
-
-    return (x - min) / (max - min)
-
-def find_ref_points(num_tests, results):
-    ref_points = {
-        "speed": 0, 
-        "pos": 0, 
-        "price": 0, 
-        "bb": 0
-    }
-    s = "speed_pos"
-    for i in range(num_tests):
-        pareto = results[s]["base"]["pareto"][i]
-        for p in pareto:
-            if p[0] > ref_points["speed"]:
-                ref_points["speed"] = p[0]
-            if p[1] > ref_points["pos"]:
-                ref_points["pos"] = p[1]
-    s = "price_bb"
-    for i in range(num_tests):
-        pareto = results[s]["base"]["pareto"][i]
-        for p in pareto:
-            if p[0] > ref_points["price"]:
-                ref_points["price"] = p[0]
-            if p[1] > ref_points["bb"]:
-                ref_points["bb"] = p[1]
-
-    return ref_points
-
-def init_results(results, methods, scenarios, fname):
-    for s in scenarios:
-        for m in methods:
-            results[s][m] = {
-                "pareto": None,
-                "no_pareto": None
-            }
-    with open(fname, "wb") as f:
-        pickle.dump(results, f)
-    f.close()
-
-def eval_methods(m1, m2, scenarios, results, ref_points):
-
-    results_normalized = {}
-    for s in scenarios:
-        results_normalized[s] = {
-            m1: {
-                "no_pareto": None,
-                "pareto": None
-            },
-            m2: {
-                "no_pareto": None,
-                "pareto": None
-            }
-        }
-        if len(s.split("_")) == 2:
-            (s1, s2) = s.split("_")
-            pareto_norm_all1 = []
-            pareto_norm_all2 = []
-            for i in range(num_tests):
-                pareto = results[s][m1]["pareto"][i]
-                pareto_norm = []
-                for p in pareto:
-                    pareto_norm.append((normalize(p[0], 0, ref_points[s1]), normalize(p[1], 0, ref_points[s2])))
-                pareto_norm = np.array(pareto_norm)
-                pareto_norm_all1.append(pareto_norm)
-
-                pareto = results[s][m2]["pareto"][i]
-                pareto_norm = []
-                for p in pareto:
-                    pareto_norm.append((normalize(p[0], 0, ref_points[s1]), normalize(p[1], 0, ref_points[s2])))
-                pareto_norm = np.array(pareto_norm)
-                pareto_norm_all2.append(pareto_norm)
-
-            results_normalized[s][m1]["no_pareto"] = results[s][m1]["no_pareto"]
-            results_normalized[s][m1]["pareto"] = pareto_norm_all1
-            results_normalized[s][m2]["no_pareto"] = results[s][m2]["no_pareto"]
-            results_normalized[s][m2]["pareto"] = pareto_norm_all2
-
-        elif len(s.split("_")) == 3:
-            (s1, s2, s3) = s.split("_")
-            pareto_norm_all1 = []
-            pareto_norm_all2 = []
-            for i in range(num_tests):
-                pareto = results[s][m1]["pareto"][i]
-                pareto_norm = []
-                for p in pareto:
-                    pareto_norm.append((normalize(p[0], 0, ref_points[s1]), normalize(p[1], 0, ref_points[s2]), normalize(p[2], 0, ref_points[s3])))
-                pareto_norm = np.array(pareto_norm)
-                pareto_norm_all1.append(pareto_norm)
-
-                pareto = results[s][m2]["pareto"][i]
-                pareto_norm = []
-                for p in pareto:
-                    pareto_norm.append((normalize(p[0], 0, ref_points[s1]), normalize(p[1], 0, ref_points[s2]), normalize(p[2], 0, ref_points[s3])))
-                pareto_norm = np.array(pareto_norm)
-                pareto_norm_all2.append(pareto_norm)
-
-            results_normalized[s][m1]["no_pareto"] = results[s][m1]["no_pareto"]
-            results_normalized[s][m1]["pareto"] = pareto_norm_all1
-            results_normalized[s][m2]["no_pareto"] = results[s][m2]["no_pareto"]
-            results_normalized[s][m2]["pareto"] = pareto_norm_all2
-
-    for s in scenarios:
-        if len(s.split("_")) == 2:
-            (s1, s2) = s.split("_")
-            ref_points = (1.0, 1.0)
-            eval_paretos(ref_points, results_normalized, s, m1, m2)
-        elif len(s.split("_")) == 3:
-            (s1, s2, s3) = s.split("_")
-            ref_points = (1.0, 1.0, 1.0)
-            eval_paretos(ref_points, results_normalized, s, m1, m2)
-        input()
-
 
 if __name__ == "__main__":
+
 
     ref_points = {}
     ref_points["speed"] = 18690.32805080772
@@ -645,8 +412,7 @@ if __name__ == "__main__":
     ref_points["price"] = 2374.112880506438
     ref_points["bb"] = 0.26230808838936703
 
-    N = 30
-    N2 = N
+    N = args.N
 
     with open('esimft_data/req_inputs_' + str(N) + '.pkl', 'rb') as f:
         req_inputs = pickle.load(f)
@@ -671,8 +437,8 @@ if __name__ == "__main__":
         print(m)
 
         if m == "base":
-            encoder_path = "/app/gearformer_model/models/Xtransformer_0.0001_18_encoder.dict"
-            decoder_path = "/app/gearformer_model/models/Xtransformer_0.0001_18_decoder.dict"
+            encoder_path = "/app/train_models/models/GearFormer_0.0001_18_encoder.dict"
+            decoder_path = "/app/train_models/models/GearFormer_0.0001_18_decoder.dict"
             gfm = GFModel(encoder_path, decoder_path)
 
             for s in scenarios:
@@ -711,8 +477,8 @@ if __name__ == "__main__":
                 f.close()
 
         elif m == "eps":
-            encoder_path = "/app/gearformer_model/models/Xtransformer_0.0001_18_encoder.dict"
-            decoder_path = "/app/gearformer_model/models/Xtransformer_0.0001_18_decoder.dict"
+            encoder_path = "/app/train_models/models/GearFormer_0.0001_18_encoder.dict"
+            decoder_path = "/app/train_models/models/GearFormer_0.0001_18_decoder.dict"
             gfm = GFModel(encoder_path, decoder_path)
 
             for s in scenarios:
@@ -819,12 +585,12 @@ if __name__ == "__main__":
                 num_pareto = []
                 pareto = []
 
-                encoder_path = "/app/gearformer_model/models/Xtransformer_0.0001_18_encoder.dict"
+                encoder_path = "/app/train_models/models/GearFormer_0.0001_18_encoder.dict"
 
                 if s == "speed_pos": 
-                    decoder1_path = "/app/gearformer_model/models/SFT_speed_15_decoder.dict"
+                    decoder1_path = "/app/train_models/models/SFT_speed_decoder.dict"
                     gfm1 = GFModel(encoder_path, decoder1_path)
-                    decoder2_path = "/app/gearformer_model/models/SFT_pos_18_decoder.dict"
+                    decoder2_path = "/app/train_models/models/SFT_pos_decoder.dict"
                     gfm2 = GFModel(encoder_path, decoder2_path)
 
                     for i in range(0, num_tests):
@@ -846,11 +612,10 @@ if __name__ == "__main__":
                         pareto.append(pareto_points)
 
                 elif s == "speed_price":
-                    decoder1_path = "/app/gearformer_model/models/SFT_speed_15_decoder.dict"
+                    decoder1_path = "/app/train_models/models/SFT_speed_decoder.dict"
                     gfm1 = GFModel(encoder_path, decoder1_path)
-                    # decoder2_path = "/app/gearformer_model/models/PPO_price_7_decoder.dict"
-                    decoder2_path = "/app/gearformer_model/models/DPO_price_14_decoder.dict"
-                    obj_encoder_path = "/app/gearformer_model/models/SFT_price_encoder.dict"
+                    decoder2_path = "/app/train_models/models/DPO_price_12_decoder.dict"
+                    obj_encoder_path = "/app/train_models/models/SFT_price_new_encoder.dict"
                     gfm2 = GFModel_obj(encoder_path, decoder2_path, obj_encoder_path)
 
                     for i in range(0, num_tests):
@@ -873,11 +638,10 @@ if __name__ == "__main__":
                         pareto.append(pareto_points)
 
                 elif s == "speed_bb":
-                    decoder1_path = "/app/gearformer_model/models/SFT_speed_15_decoder.dict"
+                    decoder1_path = "/app/train_models/models/SFT_speed_decoder.dict"
                     gfm1 = GFModel(encoder_path, decoder1_path)
-                    decoder2_path = "/app/gearformer_model/models/DPO_bb_9_decoder.dict"
-                    # decoder2_path = "/app/gearformer_model/models/PPO_bb_8_decoder.dict"
-                    obj_encoder_path = "/app/gearformer_model/models/SFT_bb_encoder.dict"
+                    decoder2_path = "/app/train_models/models/DPO_bb_11_decoder.dict"
+                    obj_encoder_path = "/app/train_models/models/SFT_bb_new_encoder.dict"
                     gfm2 = GFModel_obj(encoder_path, decoder2_path, obj_encoder_path)
 
                     for i in range(0, num_tests):
@@ -900,11 +664,10 @@ if __name__ == "__main__":
                         pareto.append(pareto_points)
 
                 elif s == "pos_price":
-                    decoder1_path = "/app/gearformer_model/models/SFT_pos_18_decoder.dict"
+                    decoder1_path = "/app/train_models/models/SFT_pos_decoder.dict"
                     gfm1 = GFModel(encoder_path, decoder1_path)
-                    # decoder2_path = "/app/gearformer_model/models/PPO_price_7_decoder.dict"
-                    decoder2_path = "/app/gearformer_model/models/DPO_price_14_decoder.dict"
-                    obj_encoder_path = "/app/gearformer_model/models/SFT_price_encoder.dict"
+                    decoder2_path = "/app/train_models/models/DPO_price_12_decoder.dict"
+                    obj_encoder_path = "/app/train_models/models/SFT_price_new_encoder.dict"
                     gfm2 = GFModel_obj(encoder_path, decoder2_path, obj_encoder_path)
 
                     for i in range(0, num_tests):
@@ -927,11 +690,10 @@ if __name__ == "__main__":
                         pareto.append(pareto_points)
 
                 elif s == "pos_bb":
-                    decoder1_path = "/app/gearformer_model/models/SFT_pos_18_decoder.dict"
+                    decoder1_path = "/app/train_models/models/SFT_pos_decoder.dict"
                     gfm1 = GFModel(encoder_path, decoder1_path)
-                    decoder2_path = "/app/gearformer_model/models/DPO_bb_9_decoder.dict"
-                    # decoder2_path = "/app/gearformer_model/models/PPO_bb_8_decoder.dict"
-                    obj_encoder_path = "/app/gearformer_model/models/SFT_bb_encoder.dict"
+                    decoder2_path = "/app/train_models/models/DPO_bb_11_decoder.dict"
+                    obj_encoder_path = "/app/train_models/models/SFT_bb_new_encoder.dict"
                     gfm2 = GFModel_obj(encoder_path, decoder2_path, obj_encoder_path)
 
                     for i in range(0, num_tests):
@@ -954,13 +716,11 @@ if __name__ == "__main__":
                         pareto.append(pareto_points)
 
                 elif s == "price_bb":
-                    decoder1_path = "/app/gearformer_model/models/DPO_price_14_decoder.dict"
-                    # decoder1_path = "/app/gearformer_model/models/PPO_price_7_decoder.dict"
-                    obj_encoder_path1 = "/app/gearformer_model/models/SFT_price_encoder.dict"
+                    decoder1_path = "/app/train_models/models/DPO_price_12_decoder.dict"
+                    obj_encoder_path1 = "/app/train_models/models/SFT_price_new_encoder.dict"
                     gfm1 = GFModel_obj(encoder_path, decoder1_path, obj_encoder_path1)
-                    decoder2_path = "/app/gearformer_model/models/DPO_bb_9_decoder.dict"
-                    # decoder2_path = "/app/gearformer_model/models/PPO_bb_8_decoder.dict"
-                    obj_encoder_path2 = "/app/gearformer_model/models/SFT_bb_encoder.dict"
+                    decoder2_path = "/app/train_models/models/DPO_bb_11_decoder.dict"
+                    obj_encoder_path2 = "/app/train_models/models/SFT_bb_new_encoder.dict"
                     gfm2 = GFModel_obj(encoder_path, decoder2_path, obj_encoder_path2)
 
                     for i in range(0, num_tests):
@@ -984,13 +744,12 @@ if __name__ == "__main__":
                         pareto.append(pareto_points)
 
                 elif s == "speed_pos_bb": 
-                    decoder1_path = "/app/gearformer_model/models/SFT_speed_15_decoder.dict"
+                    decoder1_path = "/app/train_models/models/SFT_speed_decoder.dict"
                     gfm1 = GFModel(encoder_path, decoder1_path)
-                    decoder2_path = "/app/gearformer_model/models/SFT_pos_18_decoder.dict"
+                    decoder2_path = "/app/train_models/models/SFT_pos_decoder.dict"
                     gfm2 = GFModel(encoder_path, decoder2_path)
-                    obj_encoder3_path = "/app/gearformer_model/models/SFT_bb_encoder.dict"
-                    # decoder3_path = "/app/gearformer_model/models/PPO_bb_8_decoder.dict"
-                    decoder3_path = "/app/gearformer_model/models/DPO_bb_9_decoder.dict"
+                    obj_encoder3_path = "/app/train_models/models/SFT_bb_new_encoder.dict"
+                    decoder3_path = "/app/train_models/models/DPO_bb_11_decoder.dict"
                     gfm3 = GFModel_obj(encoder_path, decoder3_path, obj_encoder3_path)
 
                     for i in range(0, num_tests):
@@ -1018,13 +777,12 @@ if __name__ == "__main__":
                         pareto.append(pareto_points)
 
                 elif s == "speed_pos_price":
-                    decoder1_path = "/app/gearformer_model/models/SFT_speed_15_decoder.dict"
+                    decoder1_path = "/app/train_models/models/SFT_speed_decoder.dict"
                     gfm1 = GFModel(encoder_path, decoder1_path)
-                    decoder2_path = "/app/gearformer_model/models/SFT_pos_18_decoder.dict"
+                    decoder2_path = "/app/train_models/models/SFT_pos_decoder.dict"
                     gfm2 = GFModel(encoder_path, decoder2_path)
-                    obj_encoder3_path = "/app/gearformer_model/models/SFT_price_encoder.dict"
-                    decoder3_path = "/app/gearformer_model/models/DPO_price_14_decoder.dict"
-                    # decoder3_path = "/app/gearformer_model/models/PPO_price_7_decoder.dict"
+                    obj_encoder3_path = "/app/train_models/models/SFT_price_new_encoder.dict"
+                    decoder3_path = "/app/train_models/models/DPO_price_12_decoder.dict"
                     gfm3 = GFModel_obj(encoder_path, decoder3_path, obj_encoder3_path)
 
                     for i in range(0, num_tests):
@@ -1052,15 +810,13 @@ if __name__ == "__main__":
                         pareto.append(pareto_points)
 
                 elif s == "speed_bb_price":
-                    decoder1_path = "/app/gearformer_model/models/SFT_speed_15_decoder.dict"
+                    decoder1_path = "/app/train_models/models/SFT_speed_decoder.dict"
                     gfm1 = GFModel(encoder_path, decoder1_path)
-                    obj_encoder2_path = "/app/gearformer_model/models/SFT_bb_encoder.dict"
-                    decoder2_path = "/app/gearformer_model/models/DPO_bb_9_decoder.dict"
-                    # decoder2_path = "/app/gearformer_model/models/PPO_bb_8_decoder.dict"
+                    obj_encoder2_path = "/app/train_models/models/SFT_bb_new_encoder.dict"
+                    decoder2_path = "/app/train_models/models/DPO_bb_11_decoder.dict"
                     gfm2 = GFModel_obj(encoder_path, decoder2_path, obj_encoder2_path)
-                    obj_encoder3_path = "/app/gearformer_model/models/SFT_price_encoder.dict"
-                    decoder3_path = "/app/gearformer_model/models/DPO_price_14_decoder.dict"
-                    # decoder3_path = "/app/gearformer_model/models/PPO_price_7_decoder.dict"
+                    obj_encoder3_path = "/app/train_models/models/SFT_price_new_encoder.dict"
+                    decoder3_path = "/app/train_models/models/DPO_price_12_decoder.dict"
                     gfm3 = GFModel_obj(encoder_path, decoder3_path, obj_encoder3_path)
 
                     for i in range(0, num_tests):
@@ -1089,15 +845,13 @@ if __name__ == "__main__":
                         pareto.append(pareto_points)
 
                 elif s == "pos_price_bb":
-                    decoder1_path = "/app/gearformer_model/models/SFT_pos_18_decoder.dict"
+                    decoder1_path = "/app/train_models/models/SFT_pos_decoder.dict"
                     gfm1 = GFModel(encoder_path, decoder1_path)
-                    obj_encoder2_path = "/app/gearformer_model/models/SFT_price_encoder.dict"
-                    # decoder2_path = "/app/gearformer_model/models/PPO_price_7_decoder.dict"
-                    decoder2_path = "/app/gearformer_model/models/DPO_price_14_decoder.dict"
+                    obj_encoder2_path = "/app/train_models/models/SFT_price_new_encoder.dict"
+                    decoder2_path = "/app/train_models/models/DPO_price_12_decoder.dict"
                     gfm2 = GFModel_obj(encoder_path, decoder2_path, obj_encoder2_path)
-                    obj_encoder3_path = "/app/gearformer_model/models/SFT_bb_encoder.dict"
-                    # decoder3_path = "/app/gearformer_model/models/PPO_bb_8_decoder.dict"
-                    decoder3_path = "/app/gearformer_model/models/DPO_bb_9_decoder.dict"
+                    obj_encoder3_path = "/app/train_models/models/SFT_bb_new_encoder.dict"
+                    decoder3_path = "/app/train_models/models/DPO_bb_11_decoder.dict"
                     gfm3 = GFModel_obj(encoder_path, decoder3_path, obj_encoder3_path)
 
                     for i in range(0, num_tests):
@@ -1142,12 +896,12 @@ if __name__ == "__main__":
                 num_pareto = []
                 pareto = []
 
-                encoder_path = "/app/gearformer_model/models/Xtransformer_0.0001_18_encoder.dict"
+                encoder_path = "/app/train_models/models/GearFormer_0.0001_18_encoder.dict"
 
                 if s == "speed_pos": 
-                    decoder1_path = "/app/gearformer_model/models/SFT_speed_15_decoder.dict"
+                    decoder1_path = "/app/train_models/models/SFT_speed_decoder.dict"
                     gfm1 = GFModel(encoder_path, decoder1_path)
-                    decoder2_path = "/app/gearformer_model/models/SFT_pos_18_decoder.dict"
+                    decoder2_path = "/app/train_models/models/SFT_pos_decoder.dict"
                     gfm2 = GFModel(encoder_path, decoder2_path)
 
                     reqs1 = req_inputs["speed_pos"]["speed_eps"][:num_tests]
@@ -1172,11 +926,10 @@ if __name__ == "__main__":
                         pareto.append(pareto_points)
 
                 elif s == "speed_price":
-                    decoder1_path = "/app/gearformer_model/models/SFT_speed_15_decoder.dict"
+                    decoder1_path = "/app/train_models/models/SFT_speed_decoder.dict"
                     gfm1 = GFModel(encoder_path, decoder1_path)
-                    # decoder2_path = "/app/gearformer_model/models/PPO_price_7_decoder.dict"
-                    decoder2_path = "/app/gearformer_model/models/DPO_price_14_decoder.dict"
-                    obj_encoder_path = "/app/gearformer_model/models/SFT_price_encoder.dict"
+                    decoder2_path = "/app/train_models/models/DPO_price_12_decoder.dict"
+                    obj_encoder_path = "/app/train_models/models/SFT_price_new_encoder.dict"
                     gfm2 = GFModel_obj(encoder_path, decoder2_path, obj_encoder_path)
 
                     reqs1 = req_inputs["speed_price"]["speed_eps"][:num_tests]
@@ -1202,11 +955,10 @@ if __name__ == "__main__":
                         pareto.append(pareto_points)
 
                 elif s == "speed_bb":
-                    decoder1_path = "/app/gearformer_model/models/SFT_speed_15_decoder.dict"
+                    decoder1_path = "/app/train_models/models/SFT_speed_decoder.dict"
                     gfm1 = GFModel(encoder_path, decoder1_path)
-                    decoder2_path = "/app/gearformer_model/models/DPO_bb_9_decoder.dict"
-                    # decoder2_path = "/app/gearformer_model/models/PPO_bb_8_decoder.dict"
-                    obj_encoder_path = "/app/gearformer_model/models/SFT_bb_encoder.dict"
+                    decoder2_path = "/app/train_models/models/DPO_bb_11_decoder.dict"
+                    obj_encoder_path = "/app/train_models/models/SFT_bb_new_encoder.dict"
                     gfm2 = GFModel_obj(encoder_path, decoder2_path, obj_encoder_path)
 
                     reqs1 = req_inputs["speed_bb"]["speed_eps"][:num_tests]
@@ -1232,10 +984,10 @@ if __name__ == "__main__":
                         pareto.append(pareto_points)
 
                 elif s == "pos_price":
-                    decoder1_path = "/app/gearformer_model/models/SFT_pos_18_decoder.dict"
+                    decoder1_path = "/app/train_models/models/SFT_pos_decoder.dict"
                     gfm1 = GFModel(encoder_path, decoder1_path)
-                    decoder2_path = "/app/gearformer_model/models/PPO_price_7_decoder.dict"
-                    obj_encoder_path = "/app/gearformer_model/models/SFT_price_encoder.dict"
+                    decoder2_path = "/app/train_models/models/DPO_price_12_decoder.dict"
+                    obj_encoder_path = "/app/train_models/models/SFT_price_new_encoder.dict"
                     gfm2 = GFModel_obj(encoder_path, decoder2_path, obj_encoder_path)
 
                     reqs1 = req_inputs["pos_price"]["pos_eps"][:num_tests]
@@ -1261,11 +1013,10 @@ if __name__ == "__main__":
                         pareto.append(pareto_points)
 
                 elif s == "pos_bb":
-                    decoder1_path = "/app/gearformer_model/models/SFT_pos_18_decoder.dict"
+                    decoder1_path = "/app/train_models/models/SFT_pos_decoder.dict"
                     gfm1 = GFModel(encoder_path, decoder1_path)
-                    decoder2_path = "/app/gearformer_model/models/DPO_bb_9_decoder.dict"
-                    # decoder2_path = "/app/gearformer_model/models/PPO_bb_8_decoder.dict"
-                    obj_encoder_path = "/app/gearformer_model/models/SFT_bb_encoder.dict"
+                    decoder2_path = "/app/train_models/models/DPO_bb_11_decoder.dict"
+                    obj_encoder_path = "/app/train_models/models/SFT_bb_new_encoder.dict"
                     gfm2 = GFModel_obj(encoder_path, decoder2_path, obj_encoder_path)
 
                     reqs1 = req_inputs["pos_bb"]["pos_eps"][:num_tests]
@@ -1291,13 +1042,11 @@ if __name__ == "__main__":
                         pareto.append(pareto_points)
 
                 elif s == "price_bb":
-                    decoder1_path = "/app/gearformer_model/models/DPO_price_14_decoder.dict"
-                    # decoder1_path = "/app/gearformer_model/models/PPO_price_7_decoder.dict"
-                    obj_encoder_path1 = "/app/gearformer_model/models/SFT_price_encoder.dict"
+                    decoder1_path = "/app/train_models/models/DPO_price_12_decoder.dict"
+                    obj_encoder_path1 = "/app/train_models/models/SFT_price_new_encoder.dict"
                     gfm1 = GFModel_obj(encoder_path, decoder1_path, obj_encoder_path1)
-                    decoder2_path = "/app/gearformer_model/models/DPO_bb_9_decoder.dict"
-                    # decoder2_path = "/app/gearformer_model/models/PPO_bb_8_decoder.dict"
-                    obj_encoder_path2 = "/app/gearformer_model/models/SFT_bb_encoder.dict"
+                    decoder2_path = "/app/train_models/models/DPO_bb_11_decoder.dict"
+                    obj_encoder_path2 = "/app/train_models/models/SFT_bb_new_encoder.dict"
                     gfm2 = GFModel_obj(encoder_path, decoder2_path, obj_encoder_path2)
 
                     reqs1 = req_inputs["price_bb"]["price_eps"][:num_tests]
@@ -1324,13 +1073,12 @@ if __name__ == "__main__":
                         pareto.append(pareto_points)
 
                 elif s == "speed_pos_bb": 
-                    decoder1_path = "/app/gearformer_model/models/SFT_speed_15_decoder.dict"
+                    decoder1_path = "/app/train_models/models/SFT_speed_decoder.dict"
                     gfm1 = GFModel(encoder_path, decoder1_path)
-                    decoder2_path = "/app/gearformer_model/models/SFT_pos_18_decoder.dict"
+                    decoder2_path = "/app/train_models/models/SFT_pos_decoder.dict"
                     gfm2 = GFModel(encoder_path, decoder2_path)
-                    obj_encoder3_path = "/app/gearformer_model/models/SFT_bb_encoder.dict"
-                    # decoder3_path = "/app/gearformer_model/models/PPO_bb_8_decoder.dict"
-                    decoder3_path = "/app/gearformer_model/models/DPO_bb_9_decoder.dict"
+                    obj_encoder3_path = "/app/train_models/models/SFT_bb_new_encoder.dict"
+                    decoder3_path = "/app/train_models/models/DPO_bb_11_decoder.dict"
                     gfm3 = GFModel_obj(encoder_path, decoder3_path, obj_encoder3_path)
 
                     reqs1 = req_inputs["speed_pos_bb"]["speed_eps"][:num_tests]
@@ -1363,13 +1111,12 @@ if __name__ == "__main__":
                         pareto.append(pareto_points)
 
                 elif s == "speed_pos_price":
-                    decoder1_path = "/app/gearformer_model/models/SFT_speed_15_decoder.dict"
+                    decoder1_path = "/app/train_models/models/SFT_speed_decoder.dict"
                     gfm1 = GFModel(encoder_path, decoder1_path)
-                    decoder2_path = "/app/gearformer_model/models/SFT_pos_18_decoder.dict"
+                    decoder2_path = "/app/train_models/models/SFT_pos_decoder.dict"
                     gfm2 = GFModel(encoder_path, decoder2_path)
-                    obj_encoder3_path = "/app/gearformer_model/models/SFT_price_encoder.dict"
-                    decoder3_path = "/app/gearformer_model/models/DPO_price_14_decoder.dict"
-                    # decoder3_path = "/app/gearformer_model/models/PPO_price_7_decoder.dict"
+                    obj_encoder3_path = "/app/train_models/models/SFT_price_new_encoder.dict"
+                    decoder3_path = "/app/train_models/models/DPO_price_12_decoder.dict"
                     gfm3 = GFModel_obj(encoder_path, decoder3_path, obj_encoder3_path)
 
                     reqs1 = req_inputs["speed_pos_price"]["speed_eps"][:num_tests]
@@ -1402,15 +1149,13 @@ if __name__ == "__main__":
                         pareto.append(pareto_points)
 
                 elif s == "speed_bb_price":
-                    decoder1_path = "/app/gearformer_model/models/SFT_speed_15_decoder.dict"
+                    decoder1_path = "/app/train_models/models/SFT_speed_decoder.dict"
                     gfm1 = GFModel(encoder_path, decoder1_path)
-                    obj_encoder2_path = "/app/gearformer_model/models/SFT_bb_encoder.dict"
-                    decoder2_path = "/app/gearformer_model/models/DPO_bb_9_decoder.dict"
-                    # decoder2_path = "/app/gearformer_model/models/PPO_bb_8_decoder.dict"
+                    obj_encoder2_path = "/app/train_models/models/SFT_bb_new_encoder.dict"
+                    decoder2_path = "/app/train_models/models/DPO_bb_11_decoder.dict"
                     gfm2 = GFModel_obj(encoder_path, decoder2_path, obj_encoder2_path)
-                    obj_encoder3_path = "/app/gearformer_model/models/SFT_price_encoder.dict"
-                    decoder3_path = "/app/gearformer_model/models/DPO_price_14_decoder.dict"
-                    # decoder3_path = "/app/gearformer_model/models/PPO_price_7_decoder.dict"
+                    obj_encoder3_path = "/app/train_models/models/SFT_price_new_encoder.dict"
+                    decoder3_path = "/app/train_models/models/DPO_price_12_decoder.dict"
                     gfm3 = GFModel_obj(encoder_path, decoder3_path, obj_encoder3_path)
 
                     reqs1 = req_inputs["speed_bb_price"]["speed_eps"][:num_tests]
@@ -1444,15 +1189,13 @@ if __name__ == "__main__":
                         pareto.append(pareto_points)
 
                 elif s == "pos_price_bb":
-                    decoder1_path = "/app/gearformer_model/models/SFT_pos_18_decoder.dict"
+                    decoder1_path = "/app/train_models/models/SFT_pos_decoder.dict"
                     gfm1 = GFModel(encoder_path, decoder1_path)
-                    obj_encoder2_path = "/app/gearformer_model/models/SFT_price_encoder.dict"
-                    # decoder2_path = "/app/gearformer_model/models/PPO_price_7_decoder.dict"
-                    decoder2_path = "/app/gearformer_model/models/DPO_price_14_decoder.dict"
+                    obj_encoder2_path = "/app/train_models/models/SFT_price_new_encoder.dict"
+                    decoder2_path = "/app/train_models/models/DPO_price_12_decoder.dict"
                     gfm2 = GFModel_obj(encoder_path, decoder2_path, obj_encoder2_path)
-                    obj_encoder3_path = "/app/gearformer_model/models/SFT_bb_encoder.dict"
-                    # decoder3_path = "/app/gearformer_model/models/PPO_bb_8_decoder.dict"
-                    decoder3_path = "/app/gearformer_model/models/DPO_bb_9_decoder.dict"
+                    obj_encoder3_path = "/app/train_models/models/SFT_bb_new_encoder.dict"
+                    decoder3_path = "/app/train_models/models/DPO_bb_11_decoder.dict"
                     gfm3 = GFModel_obj(encoder_path, decoder3_path, obj_encoder3_path)
 
                     reqs1 = req_inputs["pos_price_bb"]["pos_eps"][:num_tests]
@@ -1502,8 +1245,13 @@ if __name__ == "__main__":
             three_w1 = [0.0, 0.0, 1.0, 0.5, 0.0, 0.5, 0.33]
             three_w2 = [0.0, 1.0, 0.0, 0.5, 0.5, 0.0, 0.33]
             three_w3 = [1.0, 0.0, 0.0, 0.0, 0.5, 0.5, 0.33]
-            # three_n = [0, 4, 8, 12, 16, 20, 24, 30]
-            three_n = [0, 40, 80, 120, 160, 200, 240, 300]
+
+            if args.N == 30:
+                three_n = [0, 4, 8, 12, 16, 20, 24, 30]
+            elif args.N == 300:
+                three_n = [0, 40, 80, 120, 160, 200, 240, 300]
+            else:
+                three_n = np.linspace(0, N, 8).tolist()
 
             for s in scenarios:
                 t0 = time.time()
@@ -1520,8 +1268,8 @@ if __name__ == "__main__":
                 num_pareto = []
                 pareto = []
 
-                encoder_path = "/app/gearformer_model/models/Xtransformer_0.0001_18_encoder.dict"
-                path_default = "/app/gearformer_model/models/"
+                encoder_path = "/app/train_models/models/GearFormer_0.0001_18_encoder.dict"
+                path_default = "/app/train_models/models/"
 
                 if num_scenarios == 2:
                     (s1, s2) = s.split("_")
@@ -1549,7 +1297,7 @@ if __name__ == "__main__":
                         pareto.append(pareto_points)
 
                 elif s == "speed_price":
-                    obj_encoder_path = "/app/gearformer_model/models/SFT_price_encoder.dict"
+                    obj_encoder_path = "/app/train_models/models/SFT_price_new_encoder.dict"
 
                     for i in range(0, num_tests):
                         print(i)
@@ -1572,7 +1320,7 @@ if __name__ == "__main__":
                         pareto.append(pareto_points)
                     
                 elif s == "speed_bb":
-                    obj_encoder_path = "/app/gearformer_model/models/SFT_bb_encoder.dict"
+                    obj_encoder_path = "/app/train_models/models/SFT_bb_new_encoder.dict"
 
                     for i in range(0, num_tests):
                         print(i)
@@ -1595,7 +1343,7 @@ if __name__ == "__main__":
                         pareto.append(pareto_points)
                     
                 elif s == "pos_price":
-                    obj_encoder_path = "/app/gearformer_model/models/SFT_price_encoder.dict"
+                    obj_encoder_path = "/app/train_models/models/SFT_price_new_encoder.dict"
 
                     for i in range(0, num_tests):
                         print(i)
@@ -1618,7 +1366,7 @@ if __name__ == "__main__":
                         pareto.append(pareto_points)
 
                 elif s == "pos_bb":
-                    obj_encoder_path = "/app/gearformer_model/models/SFT_bb_encoder.dict"
+                    obj_encoder_path = "/app/train_models/models/SFT_bb_new_encoder.dict"
 
                     for i in range(0, num_tests):
                         print(i)
@@ -1641,8 +1389,8 @@ if __name__ == "__main__":
                         pareto.append(pareto_points)
 
                 elif s == "price_bb":
-                    obj1_encoder_path = "/app/gearformer_model/models/SFT_bb_encoder.dict"
-                    obj2_encoder_path = "/app/gearformer_model/models/SFT_bb_encoder.dict"
+                    obj1_encoder_path = "/app/train_models/models/SFT_price_new_encoder.dict"
+                    obj2_encoder_path = "/app/train_models/models/SFT_bb_new_encoder.dict"
 
                     for i in range(0, num_tests):
                         print(i)
@@ -1673,7 +1421,7 @@ if __name__ == "__main__":
 
                         for j in range(len(three_w1)):
                             decoder_path = path_default + "soup_" + s1 + "_" + str(three_w1[j]) + "_" + s2 + "_" + str(three_w2[j]) + "_" + s3 + "_" + str(three_w3[j]) + "_decoder.dict"
-                            obj3_encoder_path = "/app/gearformer_model/models/SFT_bb_encoder.dict"
+                            obj3_encoder_path = "/app/train_models/models/SFT_bb_new_encoder.dict"
                             gfm = GFModel_obj(encoder_path, decoder_path, obj3_encoder_path)
                             r = req[three_n[j]:three_n[j+1]]
                             r_orig = r[:,:8]
@@ -1695,7 +1443,7 @@ if __name__ == "__main__":
 
                         for j in range(len(three_w1)):
                             decoder_path = path_default + "soup_" + s1 + "_" + str(three_w1[j]) + "_" + s2 + "_" + str(three_w2[j]) + "_" + s3 + "_" + str(three_w3[j]) + "_decoder.dict"
-                            obj3_encoder_path = "/app/gearformer_model/models/SFT_price_encoder.dict"
+                            obj3_encoder_path = "/app/train_models/models/SFT_price_new_encoder.dict"
                             gfm = GFModel_obj(encoder_path, decoder_path, obj3_encoder_path)
                             r = req[three_n[j]:three_n[j+1]]
                             r_orig = r[:,:8]
@@ -1717,8 +1465,8 @@ if __name__ == "__main__":
 
                         for j in range(len(three_w1)):
                             decoder_path = path_default + "soup_" + s1 + "_" + str(three_w1[j]) + "_" + s2 + "_" + str(three_w2[j]) + "_" + s3 + "_" + str(three_w3[j]) + "_decoder.dict"
-                            obj2_encoder_path = "/app/gearformer_model/models/SFT_bb_encoder.dict"
-                            obj3_encoder_path = "/app/gearformer_model/models/SFT_price_encoder.dict"
+                            obj2_encoder_path = "/app/train_models/models/SFT_bb_new_encoder.dict"
+                            obj3_encoder_path = "/app/train_models/models/SFT_price_new_encoder.dict"
                             gfm = GFModel_obj2(encoder_path, decoder_path, obj2_encoder_path, obj3_encoder_path)
                             r = req[three_n[j]:three_n[j+1]]
                             r_orig = r[:,:8]
@@ -1741,8 +1489,8 @@ if __name__ == "__main__":
 
                         for j in range(len(three_w1)):
                             decoder_path = path_default + "soup_" + s1 + "_" + str(three_w1[j]) + "_" + s2 + "_" + str(three_w2[j]) + "_" + s3 + "_" + str(three_w3[j]) + "_decoder.dict"
-                            obj2_encoder_path = "/app/gearformer_model/models/SFT_price_encoder.dict"
-                            obj3_encoder_path = "/app/gearformer_model/models/SFT_bb_encoder.dict"
+                            obj2_encoder_path = "/app/train_models/models/SFT_price_new_encoder.dict"
+                            obj3_encoder_path = "/app/train_models/models/SFT_bb_new_encoder.dict"
                             gfm = GFModel_obj2(encoder_path, decoder_path, obj2_encoder_path, obj3_encoder_path)
                             r = req[three_n[j]:three_n[j+1]]
                             r_orig = r[:,:8]
@@ -1781,10 +1529,10 @@ if __name__ == "__main__":
                 num_pareto = []
                 pareto = []
 
-                encoder_path = "/app/gearformer_model/models/Xtransformer_0.0001_18_encoder.dict"
-                obj_encoder_path = "/app/gearformer_model/models/SFT_ric_obj_encoder.dict"
-                w_encoder_path = "/app/gearformer_model/models/SFT_ric_w_encoder.dict"
-                decoder_path = "/app/gearformer_model/models/SFT_ric_decoder.dict"
+                encoder_path = "/app/train_models/models/GearFormer_0.0001_18_encoder.dict"
+                obj_encoder_path = "/app/train_models/models/SFT_ric_obj_encoder.dict"
+                w_encoder_path = "/app/train_models/models/SFT_ric_w_encoder.dict"
+                decoder_path = "/app/train_models/models/SFT_ric_decoder.dict"
 
                 gfm = GFModel_w(encoder_path, decoder_path, obj_encoder_path, w_encoder_path)
 
@@ -1809,11 +1557,22 @@ if __name__ == "__main__":
                 elif s == "pos_price_bb":
                     w = [[0, 1, 0 ,0], [0, 0, 1, 0], [0, 0, 0, 1], [0, 1, 1, 0], [0, 1, 0, 1], [0, 0, 1, 1], [0, 1, 1, 1]]
 
+
             
                 if num_scenarios == 2:
-                    n = [0, 100, 200, 300]
+                    if args.N == 30:
+                        n = [0, 10, 20, 30]
+                    elif args.N == 300:
+                        n = [0, 100, 200, 300]
+                    else:
+                        n = np.linspace(0, N, 4).tolist()
                 else:
-                    n = [0, 40, 80, 120, 160, 200, 240, 300]
+                    if args.N == 30:
+                        n = [0, 4, 8, 12, 16, 20, 24, 30]
+                    elif args.N == 300:
+                        n = [0, 40, 80, 120, 160, 200, 240, 300]
+                    else:
+                        n = np.linspace(0, N, 8).tolist()
 
                 for i in range(0, num_tests):
                     print(i)

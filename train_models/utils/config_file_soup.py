@@ -17,7 +17,7 @@ def config():
     parser.add_argument('--model_name', type=str, default="Xtransformer", help = "It should be Xtransformer")
     parser.add_argument('--lr', type=float, default=0.0001 , help = "learning rat for optimizer")
     parser.add_argument('--if_weight', type=bool, default=False, help = "pass weight as input to the model if true - it's always false in current version")
-    parser.add_argument('--encoder_checkpoint_name', type=str, default="Xtransformer_0.0001_18_encoder.dict" , help = "name of the encoder checkpoint")
+    parser.add_argument('--encoder_checkpoint_name', type=str, default="GearFormer_0.0001_18_encoder.dict" , help = "name of the encoder checkpoint")
     parser.add_argument('--encoder_price_checkpoint_name', type=str, default="SFT_price_new_encoder.dict" , help = "name of the decoder checkpoint")
     parser.add_argument('--encoder_bb_checkpoint_name', type=str, default="SFT_bb_new_encoder.dict" , help = "name of the decoder checkpoint")
     parser.add_argument('--decoder_speed_checkpoint_name', type=str, default="SFT_speed_decoder.dict" , help = "name of the decoder checkpoint")
