@@ -15,8 +15,8 @@ __pycache__/
 *.csv
 *.h5
 *.dict
-!/train_models/models/GearFormer_0.0001_18_encoder.dict
-!/train_models/models/GearFormer_0.0001_18_decoder.dict
+!/checkpointss/GearFormer_0.0001_18_encoder.dict
+!/checkpointss/GearFormer_0.0001_18_decoder.dict
 
 /gearformer_model/log.txt
 
