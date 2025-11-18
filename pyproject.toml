@@ -1,0 +1,30 @@
+[project]
+name = "esimft"
+version = "1.1"
+description = "e-SimFT: Alignment of Generative Models with Simulation Feedback for Pareto-Front Design Exploration"
+authors = [{ name = "Hyunmin Cheong" }]
+requires-python = ">=3.9"
+
+dependencies = [
+    "numpy",
+    "pillow",
+    "torch",
+    "openmdao",
+    "matplotlib",
+    "packaging",
+    "einops",
+    "pandas",
+    "scipy",
+    "scikit-learn",
+    "x-transformers",
+    "tqdm",
+    "pydantic",
+    "h5py",
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
