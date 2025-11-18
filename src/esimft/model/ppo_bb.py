@@ -7,7 +7,7 @@ torch.manual_seed(0)
 import torch.nn as nn
 import torch.nn.functional as F
 from simulator.gear_train_simulator import Simulator
-from simulator.util.suppress_print import SuppressPrint
+from esimft.utils.processing import SuppressPrint
 from .utils.helper import is_grammatically_correct, is_physically_feasible
 from concurrent.futures import ThreadPoolExecutor
 

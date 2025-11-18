@@ -61,8 +61,8 @@ python scripts/datagen/gen_ric_data.py
 
 ```
 python scripts/datagen/aug_data.py --aug_data_type pareto
-python prepare_pareto_problems.py
-python prepare_pareto_samples.py --N 30
+python scripts/datagen/prepare_pareto_problems.py --pareto_exp_num_problems 30
+python scripts/datagen/prepare_pareto_samples.py --pareto_exp_num_problems 30
 ```
 
 ### 7. SFT the pre-trained model w.r.t. original requirements.
@@ -101,7 +101,7 @@ python eval_or.py --decoder_checkpoint_name "SFT_[pos/speed]_decoder.dict" --req
 ### 12. To evaluate the baseline, SFT models, and DPO/PPO models w.r.t. new requirements:
 
 ```
-python aug_test_data.py
+python aug_data.py --aug_data_type simft_new_req
 
 python eval_baseline_nr.py --req_name "[price/bb]"
 

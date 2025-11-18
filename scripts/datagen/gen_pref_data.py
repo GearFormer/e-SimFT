@@ -3,8 +3,8 @@ import torch
 torch.manual_seed(0)
 import os
 from esimft.utils.config_file import config
-from esimft.utils.suppress_print import SuppressPrint
-from esimft.utils.sim import run_simulator, calculate_volume
+from esimft.utils.processing import SuppressPrint
+from esimft.utils.gearformer.sim import run_simulator, calculate_volume
 from esimft.model.gearformer import GFModel
 import pandas as pd
 from concurrent.futures import ThreadPoolExecutor
@@ -33,7 +33,7 @@ if __name__ == "__main__":
         req_input_batch = []
         for j in range(0, config.BS):
             req_input = []
-            for k in range(config.gf_data_req_start_idx, config.gf_data_req_end_idx+1):
+            for k in range(config.gf_data_req_input_start_idx, config.gf_data_req_input_end_idx+1):
                 req_input.append(row.iloc[k])
             req_input_batch.append(req_input)
 

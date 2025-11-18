@@ -10,18 +10,17 @@ if __name__ == "__main__":
 
     data = pd.read_pickle(config.pareto_test_aug_data)
     num_problems = config.pareto_exp_num_problems
-    data_col_offset = 2
     
-    input_motion_type = data.iloc[:num_problems, 2].to_list()
-    output_motion_type = data.iloc[:num_problems, 3].to_list()
+    input_motion_type = data.iloc[:num_problems, config.gf_data_req_input_motion_type_idx].to_list()
+    output_motion_type = data.iloc[:num_problems, config.gf_data_req_output_motion_type_idx].to_list()
     
-    speed_ratio = data.iloc[:, 4].to_list()
+    speed_ratio = data.iloc[:, config.gf_data_req_speed_idx].to_list()
     speed_min = np.min(speed_ratio)
     speed_max = np.max(speed_ratio)
 
-    output_position_x = data.iloc[:, 5]
-    output_position_y = data.iloc[:, 6]
-    output_position_z = data.iloc[:, 7]
+    output_position_x = data.iloc[:, config.gf_data_req_pos_idx[0]]
+    output_position_y = data.iloc[:, config.gf_data_req_pos_idx[1]]
+    output_position_z = data.iloc[:, config.gf_data_req_pos_idx[2]]
     pos_x_min = np.min(output_position_x)
     pos_x_max = np.max(output_position_x)
     pos_y_min = np.min(output_position_y)
@@ -29,14 +28,14 @@ if __name__ == "__main__":
     pos_z_min = np.min(output_position_z)
     pos_z_max = np.max(output_position_z)
 
-    output_motion_direction = data.iloc[:num_problems, 8].to_list()
-    output_motion_sign = data.iloc[:num_problems, 9].to_list()
+    output_motion_direction = data.iloc[:num_problems, config.gf_data_req_output_motion_dir].to_list()
+    output_motion_sign = data.iloc[:num_problems, config.gf_data_req_output_motion_sign].to_list()
     
-    price = data.iloc[:, 11]
+    price = data.iloc[:, config.gf_data_req_price]
     price_min = np.min(price)
     price_max = np.max(price)
 
-    bb_vol = data.iloc[:, 12]
+    bb_vol = data.iloc[:, config.gf_data_req_bb_volume]
     bb_vol_min = np.min(bb_vol)
     bb_vol_max = np.max(bb_vol)
 
@@ -51,5 +50,5 @@ if __name__ == "__main__":
     problems = np.array((input_motion_type, output_motion_type, speeds, pos_x, pos_y, pos_z, 
                         output_motion_direction, output_motion_sign, prices, bb_vols)).T
     
-    with open('esimft_data/pareto_problems.pkl', 'wb') as f:
+    with open(config.pareto_problems_data, 'wb') as f:
         pickle.dump(problems, f)

@@ -1,5 +1,5 @@
-from gear_train_simulator import Simulator
-from util.suppress_print import SuppressPrint
+from esimft.gear_train_simulator.simulator import Simulator
+from util.processing import SuppressPrint
 import h5py
 import concurrent.futures
 from concurrent.futures import ProcessPoolExecutor, TimeoutError

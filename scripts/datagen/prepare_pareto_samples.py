@@ -1,7 +1,8 @@
 import numpy as np
 import pandas as pd
 import pickle
-import argparse
+import os
+from esimft.utils.config_file import config
 
 
 def prepare_req(data, N):
@@ -178,16 +179,16 @@ def prepare_req(data, N):
     return req_inputs
 
 if __name__ == "__main__":
+    config = config()
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--N", type=str, required=True, help="sample size")    
-    args = parser.parse_args()
+    N = config.pareto_exp_num_problems
 
-    N = int(args.N)
+    test_data = pd.read_pickle(config.pareto_problems_data)
 
-    test_data = pd.read_pickle("esimft_data/pareto_problems.pkl")
+    data_prepared = prepare_req(test_data, N)
 
-    prep_data = prepare_req(test_data, N)
+    os.makedirs(config.pareto_samples_folder, exist_ok=True)
+    data_output_path = os.path.join(config.pareto_samples_folder, f"req_inputs_{N}.pkl")
 
-    with open('esimft_data/req_inputs_' + str(N) + '.pkl', 'wb') as f:
-        pickle.dump(prep_data, f)
+    with open(data_output_path, 'wb') as f:
+        pickle.dump(data_prepared, f)

@@ -4,7 +4,7 @@ import ast
 from concurrent.futures import ThreadPoolExecutor
 from esimft.utils.config_file import config
 from esimft.utils.data_handle import DataHandler
-from esimft.utils.sim import run_simulator, calculate_volume
+from esimft.utils.gearformer.sim import run_simulator, calculate_volume
 
 
 if __name__ == "__main__":
@@ -14,9 +14,15 @@ if __name__ == "__main__":
     if config.aug_data_type == "pref":
         data = pd.read_pickle(config.pref_data)
         save_file = config.ric_aug_data
-    elif config.aug_data_type == "pareto":
+    elif config.aug_data_type == "pareto_test":
         data = pd.read_pickle(config.pareto_test_data)
         save_file = config.pareto_test_aug_data
+    elif config.aug_data_type == "simft_test":
+        data = pd.read_pickle(config.simft_test_data)
+        save_file = config.simft_test_aug_data
+    else:
+        print("aug_data_type not specified / supported")
+        exit()
 
     data_size = len(data)
 
@@ -30,7 +36,7 @@ if __name__ == "__main__":
         row = data.iloc[i]
 
         req_input = []
-        for k in range(config.gf_data_req_start_idx, config.gf_data_req_end_idx+1):
+        for k in range(config.gf_data_req_input_start_idx, config.gf_data_req_input_end_idx+1):
             req_input.append(row.iloc[k])
 
         seq_idx = ast.literal_eval(row.iloc[-1])

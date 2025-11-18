@@ -10,7 +10,7 @@ from train_models.utils.config_file import config
 from train_models.load_model import loading_model
 from train_models.utils.helper import is_grammatically_correct, is_physically_feasible
 from simulator.gear_train_simulator import Simulator
-from simulator.util.suppress_print import SuppressPrint
+from esimft.utils.processing import SuppressPrint
 torch.set_printoptions(threshold=10_000)
 import pandas as pd
 from concurrent.futures import ThreadPoolExecutor

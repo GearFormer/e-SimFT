@@ -3,8 +3,8 @@ import numpy as np
 import torch
 torch.manual_seed(0)
 from esimft.utils.config_file import config
-from esimft.utils.suppress_print import SuppressPrint
-from esimft.utils.run_simulator import run_simulator
+from esimft.utils.processing import SuppressPrint
+from esimft.utils.gearformer.sim import run_simulator
 from esimft.model.gearformer import GFModel
 import pandas as pd
 
@@ -27,10 +27,11 @@ if __name__ == "__main__":
     for i in range(0, data_size):
 
         print(i, " out of ", data_size)
+        
         row = data.iloc[i]
         req_input = []
         
-        for k in range(config.gf_data_sim_input_start_idx, config.gf_data_sim_input_end_idx+1):
+        for k in range(config.gf_data_req_input_start_idx, config.gf_data_req_input_end_idx+1):
             req_input.append(row.iloc[k])
         
         if config.req_name == "speed":

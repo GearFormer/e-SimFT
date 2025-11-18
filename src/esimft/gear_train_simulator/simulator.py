@@ -4,6 +4,9 @@ from .util.compute_obj import compute_weight, compute_price
 import openmdao.api as om
 import numpy as np
 
+
+
+
 class Simulator:
 
     def run(self, input_data):

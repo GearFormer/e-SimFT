@@ -1,5 +1,5 @@
-from esimft.simulator.gear_train_simulator import Simulator
-from esimft.utils.helper import is_grammatically_correct, is_physically_feasible
+from esimft.gear_train_simulator.simulator import Simulator
+from esimft.utils.gearformer.helper import is_grammatically_correct, is_physically_feasible
 
 
 def run_simulator(config, sim_input):
