@@ -14,9 +14,7 @@ __pycache__/
 *.pkl
 *.csv
 *.h5
-*.dict
-!/checkpointss/GearFormer_0.0001_18_encoder.dict
-!/checkpointss/GearFormer_0.0001_18_decoder.dict
+
 
 /gearformer_model/log.txt
 
