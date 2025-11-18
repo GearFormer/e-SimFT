@@ -1,5 +1,4 @@
 import os
-import random
 import numpy as np
 import torch
 torch.manual_seed(0)
@@ -30,13 +29,18 @@ if __name__ == "__main__":
         print(i, " out of ", data_size)
         row = data.iloc[i]
         req_input = []
-        for k in range(config.gf_data_req_start_idx, config.gf_data_req_end_idx+1):
+        
+        for k in range(config.gf_data_sim_input_start_idx, config.gf_data_sim_input_end_idx+1):
             req_input.append(row.iloc[k])
         
         if config.req_name == "speed":
-            target_speed = req_input[config.gf_data_req_speed_idx]
+            target_speed = row.iloc[config.gf_data_req_speed_idx]
         elif config.req_name == "pos":
-            target_pos = [req_input[3], req_input[4], req_input[5]]
+            target_pos = [
+                row.iloc[config.gf_data_req_pos_idx[0]], 
+                row.iloc[config.gf_data_req_pos_idx[1]], 
+                row.iloc[config.gf_data_req_pos_idx[2]],
+            ]
         else:
             print("Requirement name not supported")
             exit()

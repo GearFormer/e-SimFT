@@ -1,16 +1,16 @@
-import random
-random.seed(0)
 import numpy as np
 np.random.seed(0)
 import pandas as pd
 import pickle
+from esimft.utils.config_file import config
 
 
 if __name__ == "__main__":
+    config = config()
 
-    data = pd.read_pickle("esimft_data/pareto_test_obj.pkl")
-
-    num_problems = 30
+    data = pd.read_pickle(config.pareto_test_aug_data)
+    num_problems = config.pareto_exp_num_problems
+    data_col_offset = 2
     
     input_motion_type = data.iloc[:num_problems, 2].to_list()
     output_motion_type = data.iloc[:num_problems, 3].to_list()

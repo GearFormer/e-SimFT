@@ -1,7 +1,4 @@
-import random
-random.seed(0)
 import numpy as np
-np.random.seed(0)
 import pandas as pd
 import pickle
 import argparse

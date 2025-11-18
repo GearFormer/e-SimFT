@@ -11,7 +11,13 @@ if __name__ == "__main__":
     config = config()
     data_handler = DataHandler(config)
 
-    data = pd.read_pickle(config.pref_data)
+    if config.aug_data_type == "pref":
+        data = pd.read_pickle(config.pref_data)
+        save_file = config.ric_aug_data
+    elif config.aug_data_type == "pareto":
+        data = pd.read_pickle(config.pareto_test_data)
+        save_file = config.pareto_test_aug_data
+
     data_size = len(data)
 
     print("simulating...")
@@ -39,10 +45,6 @@ if __name__ == "__main__":
         
         results.append(run_simulator(config, input_data))
 
-    # num_threads = 32
-    # with ThreadPoolExecutor(max_workers=num_threads) as executor, SuppressPrint():
-    #     results = list(executor.map(run_simulator, data2sim))
-    
     print("augmenting...")
     new_data = []
     for i in range(0, data_size):
@@ -73,4 +75,4 @@ if __name__ == "__main__":
     df = pd.DataFrame(new_data)
     save_file = config.ric_aug_data
     df.to_pickle(save_file)
-    print(f"Augmented new requirement data for rewards-in-context benchmarking saved at: {save_file}")
+    print(f"Augmented new requirement data for {config.aug_data_type} benchmarking saved at: {save_file}")

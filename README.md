@@ -26,7 +26,7 @@ docker run --rm -it --name esimft --gpus all -v ./:/app esimft
 ### 1. Using the original validation and test portions of the original GearFormer dataset, prepare the dataset for e-SimFT.
 
 ```
-python scripts/generate_data/prepare_simft_data.py
+python scripts/datagen/prepare_simft_data.py
 ```
 
 This will create 4 new dataset files (pkl) in `./data/esimft_data/`
@@ -34,33 +34,33 @@ This will create 4 new dataset files (pkl) in `./data/esimft_data/`
 ### 2. Create SFT data for original requirements.
 
 ```
-python scripts/generate_data/gen_sft_data_original_req.py --req_name speed
-python scripts/generate_data/gen_sft_data_original_req.py --req_name pos
+python scripts/datagen/gen_sft_data_original_req.py --req_name speed
+python scripts/datagen/gen_sft_data_original_req.py --req_name pos
 ```
 
 ### 3. Create SFT data for new requirements.
 
 ```
-python scripts/generate_data/gen_sft_data_new_req.py
+python scripts/datagen/gen_sft_data_new_req.py
 ```
 
 ### 4. Create preference data for new requirements.
 
 ```
-python scripts/generate_data/gen_pref_data.py
+python scripts/datagen/gen_pref_data.py
 ```
 
 ### 5. (for benchmarking) Create rewards-in-context training data.
 
 ```
-python scripts/generate_data/aug_pref_data.py
-python scripts/generate_data/gen_ric_data.py
+python scripts/datagen/aug_data.py --aug_data_type pref
+python scripts/datagen/gen_ric_data.py
 ```
 
 ### 6. (for benchmarking) Prepare Pareto problems and sampling strategies.
 
 ```
-python aug_pareto_data.py
+python scripts/datagen/aug_data.py --aug_data_type pareto
 python prepare_pareto_problems.py
 python prepare_pareto_samples.py --N 30
 ```
