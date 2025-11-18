@@ -11,6 +11,8 @@ Link to paper: https://arxiv.org/abs/2502.02628
 git clone git@github.com:GearFormer/e-SimFT.git
 ```
 
+Download checkpoints `*.dict` from https://github.com/GearFormer/GearFormer/tree/main/gearformer_model/checkpoints and place them in `./checkpoints`
+
 Download `test_data.csv` and `val_data.csv` from https://github.com/GearFormer/GearFormer/tree/main/dataset and place them in `./data/gearformer_data`
 
 Build and launch the docker container (change the Dockerfile base image as required):
