@@ -3,6 +3,7 @@ import pandas as pd
 import ast
 from concurrent.futures import ThreadPoolExecutor
 from esimft.utils.config_file import config
+from esimft.utils.processing import SuppressPrint
 from esimft.utils.data_handle import DataHandler
 from esimft.utils.gearformer.sim import run_simulator, calculate_volume
 
@@ -11,7 +12,7 @@ if __name__ == "__main__":
     config = config()
     data_handler = DataHandler(config)
 
-    if config.aug_data_type == "pref":
+    if config.aug_data_type == "ric":
         data = pd.read_pickle(config.pref_data)
         save_file = config.ric_aug_data
     elif config.aug_data_type == "pareto_test":
@@ -79,6 +80,5 @@ if __name__ == "__main__":
 
     print("storing files...")
     df = pd.DataFrame(new_data)
-    save_file = config.ric_aug_data
     df.to_pickle(save_file)
     print(f"Augmented new requirement data for {config.aug_data_type} benchmarking saved at: {save_file}")

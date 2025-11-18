@@ -13,6 +13,8 @@ if __name__ == "__main__":
     config = config()
 
     gfm = GFModel(config)
+    gfm.encoder.eval()
+    gfm.decoder.eval()
 
     # use both data for sft and pref finetuning
     data1 = pd.read_pickle(config.sft_data)

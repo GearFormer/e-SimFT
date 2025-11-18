@@ -16,7 +16,9 @@ if __name__ == "__main__":
     config = config()
 
     gfm = GFModel(config)
-
+    gfm.encoder.eval()
+    gfm.decoder.eval()
+    
     # use both data for sft and pref finetuning
     data1 = pd.read_pickle(config.sft_data)
     data2 = pd.read_pickle(config.pref_data)
@@ -104,7 +106,7 @@ if __name__ == "__main__":
     print("storing files...")
     print(f"SFT data for new requirements (price and bounding box) saved at: {train_dataset_name} and {val_dataset_name}")
 
-    df = pd.DataFrame(train_dataset, columns=['req_input', 'chosen_seq'])
+    df = pd.DataFrame(train_dataset, columns=['req_input', 'chosen_seq', 'new_req'])
     df.to_pickle(train_dataset_name)
-    df = pd.DataFrame(val_dataset, columns=['req_input', 'chosen_seq'])
+    df = pd.DataFrame(val_dataset, columns=['req_input', 'chosen_seq', 'new_req'])
     df.to_pickle(val_dataset_name)

@@ -63,41 +63,28 @@ class SMDataset(torch.utils.data.Dataset):
     def __len__(self):
         return len(self.req_input)
 
+
 class SFTDataset(torch.utils.data.Dataset):
-    def __init__(self, req_input, chosen_seq):
-        self.req_input = req_input.values
-        self.chosen_seq = chosen_seq.values
-
-    def __getitem__(self, index):
-        return torch.Tensor(self.req_input[index]), torch.Tensor(self.chosen_seq[index])
-
-    def __len__(self):
-        return len(self.req_input)
-
-class SFTObjDataset(torch.utils.data.Dataset):
-    def __init__(self, req_input, chosen_seq, obj_list):
-        self.req_input = req_input.values
-        self.chosen_seq = chosen_seq.values
-        self.obj_list = obj_list.values
-
-    def __getitem__(self, index):
-        return torch.Tensor(self.req_input[index]), torch.Tensor(self.chosen_seq[index]), torch.Tensor(self.obj_list[index])
-
-    def __len__(self):
-        return len(self.req_input)
-
-class SFTRiCDataset(torch.utils.data.Dataset):
     def __init__(self, req_input, seq, new_req, weights):
         self.req_input = req_input.values
         self.seq = seq.values
-        self.new_req = new_req.values
-        self.weights = weights.values
+
+        if new_req is not None:
+            self.new_req = new_req.values
+        else:
+            self.new_req = req_input.values # placeholder
+
+        if weights is not None:
+            self.weights = weights.values
+        else:
+            self.weights = req_input.values # placeholder
 
     def __getitem__(self, index):
         return torch.Tensor(self.req_input[index]), torch.Tensor(self.seq[index]), torch.Tensor(self.new_req[index]), torch.Tensor(self.weights[index])
 
     def __len__(self):
         return len(self.req_input)
+
 
 class DataHandler:
     def __init__(self, config):
@@ -210,9 +197,11 @@ class DataHandler:
 
         req_input = df.iloc[:,0]
         chosen_seq = df.iloc[:,1]
+        obj_list = None
+        weights = None
 
         kwargs = {'num_workers': 0} if torch.cuda.is_available() else {}
-        loader = torch.utils.data.DataLoader(SFTDataset(req_input, chosen_seq), batch_size=BS, shuffle=True, **kwargs)
+        loader = torch.utils.data.DataLoader(SFTDataset(req_input, chosen_seq, obj_list, weights), batch_size=BS, shuffle=True, **kwargs)
         
         return loader
 
@@ -228,9 +217,10 @@ class DataHandler:
         req_input = df.iloc[:,0]
         chosen_seq = df.iloc[:,1]
         obj_list = df.iloc[:,2]
+        weights = None
 
         kwargs = {'num_workers': 0} if torch.cuda.is_available() else {}
-        loader = torch.utils.data.DataLoader(SFTObjDataset(req_input, chosen_seq, obj_list), batch_size=BS, shuffle=True, **kwargs)
+        loader = torch.utils.data.DataLoader(SFTDataset(req_input, chosen_seq, obj_list, weights), batch_size=BS, shuffle=True, **kwargs)
         
         return loader
 
@@ -249,7 +239,7 @@ class DataHandler:
         weights = df.iloc[:,3]
 
         kwargs = {'num_workers': 0} if torch.cuda.is_available() else {}
-        loader = torch.utils.data.DataLoader(SFTRiCDataset(req_input, seq, new_req, weights), batch_size=BS, shuffle=True, **kwargs)
+        loader = torch.utils.data.DataLoader(SFTDataset(req_input, seq, new_req, weights), batch_size=BS, shuffle=True, **kwargs)
         
         return loader
     

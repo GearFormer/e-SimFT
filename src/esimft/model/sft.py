@@ -1,71 +1,107 @@
 import torch
-import random
-random.seed(0)
 import numpy as np
-np.random.seed(0)
 torch.manual_seed(0)
-import torch.nn.functional as F
-from einops import rearrange
+from esimft.model.functions import compute_cross_entropy_loss
+from esimft.model.gearformer import ObjEncoder, WeightEncoder
+import torch.optim as optim
 
-def compute_logprobs(logits, seq):
 
-    seq = seq[:,1:]
+class SFT:
+    def __init__(self, config, model, freeze_encoder=True, fit_new_req=False, fit_req_weights=False):
 
-    log_probs = F.log_softmax(logits, dim=-1)
+        self.config = config
+        self.encoder = model.encoder
+        self.decoder = model.decoder
+        self.freeze_encoder = freeze_encoder
+        self.fit_new_req = fit_new_req
+        self.fit_req_weights = fit_req_weights
 
-    # Gather the log probabilities for the actual labels
-    selected_log_probs = torch.gather(
-        input=log_probs,
-        dim=-1,
-        index=seq.unsqueeze(-1)
-    ).squeeze(-1)
+        if freeze_encoder:
+            self.encoder.eval()
+        else:
+            self.encoder.train()
+            self.encoder_optimizer = optim.Adam(self.encoder.parameters(), lr=config.lr)
 
-    return selected_log_probs
+        self.decoder.train()
+        self.decoder_optimizer = optim.Adam(self.decoder.parameters(), lr=config.lr)
 
-def train_sft(input_data, seq, decoder, decoder_optimizer, output_size=53):
-    
-    decoder.train()
-    decoder_optimizer.zero_grad()
-    
-    _, (logits, _) = decoder(seq.long(), context = input_data, return_outputs = True) 
-    
-    target = seq.long()[:, 1:]
-    loss = torch.nn.functional.cross_entropy(
-            rearrange(logits, 'b n c -> b c n'),
-            target,
-            ignore_index = output_size-1,
-            reduction = "none"
-    )
-    loss = loss.mean(-1).mean()
+        if fit_new_req:
+            if fit_req_weights:
+                self.new_req_encoder = ObjEncoder(input_size=2, output_size=config.dim)
+                self.weight_encoder = WeightEncoder(input_size=4, output_size=config.dim)
+                self.weight_encoder.to(model.device)
 
-    # log_prob = compute_logprobs(logits, seq.long())
-    # loss = -log_prob.mean(-1).mean()
+                self.weight_encoder_optimizer = optim.Adam(self.weight_encoder.parameters(), lr=config.lr)
 
-    loss.backward()
-    
-    decoder_optimizer.step()
+            else:
+                self.new_req_encoder = ObjEncoder(input_size=1, output_size=config.dim)
+            
+            self.new_req_encoder.to(model.device)
+            self.new_req_encoder_optimizer = optim.Adam(self.new_req_encoder.parameters(), lr=config.lr)
 
-    return loss.item()
 
-def val_sft(input_data, seq, decoder, output_size=53):
-    
-    decoder.eval()
-
-    with torch.no_grad():
-
-        _, (logits, _) = decoder(seq.long(), context = input_data, return_outputs = True) 
+    def training_step(self, input_data, target, ignore_index=52, new_req_list=None, weights=None):
         
-        target = seq.long()[:, 1:]
-        loss = torch.nn.functional.cross_entropy(
-                rearrange(logits, 'b n c -> b c n'),
-                target,
-                ignore_index = output_size-1,
-                reduction = "none"
-        )
-        loss = loss.mean(-1).mean()
+        if not self.freeze_encoder:
+            self.encoder_optimizer.zero_grad()
 
-        # log_prob = compute_logprobs(logits, seq.long())
-        # loss = -log_prob.mean(-1).mean()
+        self.decoder_optimizer.zero_grad()
+        
+        encoded_input = self.encoder(input_data)
+
+        if self.fit_new_req and new_req_list is not None:
+            self.new_req_encoder_optimizer.zero_grad()
+            encoded_new_req = self.new_req_encoder(new_req_list)
+            encoded_input += encoded_new_req
+
+        if self.fit_req_weights and weights is not None:
+            self.weight_encoder_optimizer.zero_grad()
+            encoded_weights = self.weight_encoder(weights)
+            encoded_input += encoded_weights
+
+        target = target.long()
+
+        _, (logits, _) = self.decoder(target, context = encoded_input, return_outputs = True) 
+        
+        loss = compute_cross_entropy_loss(logits, target[:, 1:], ignore_index=ignore_index)
+
+        loss.backward()
+
+        if not self.freeze_encoder:
+            self.encoder_optimizer.step()
+
+        if self.fit_new_req:
+            self.encoded_new_req.step()
+
+        if self.fit_req_weights:
+            self.weight_encoder_optimizer.step()
+
+        self.decoder_optimizer.step()
 
         return loss.item()
- 
+
+    def validation_step(self, input_data, target, ignore_index=52, new_req_list=None, weights=None):
+        
+        self.encoder.eval()
+        self.decoder.eval()
+
+        with torch.no_grad():
+            encoded_input = self.encoder(input_data)
+
+            if self.fit_new_req and new_req_list is not None:
+                self.new_req_encoder.eval()
+                encoded_new_req = self.new_req_encoder(new_req_list)
+                encoded_input += encoded_new_req
+
+            if self.fit_req_weights and weights is not None:
+                self.weight_encoder.eval()
+                encoded_weights = self.weight_encoder(weights)
+                encoded_input += encoded_weights
+
+            target = target.long()
+
+            _, (logits, _) = self.decoder(target, context = encoded_input, return_outputs = True) 
+            
+            loss = compute_cross_entropy_loss(logits, target[:, 1:], ignore_index=ignore_index)
+
+        return loss.item()

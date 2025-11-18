@@ -10,8 +10,6 @@ from esimft.utils.data_handle import DataHandler
 from x_transformers import AutoregressiveWrapper, TransformerWrapper, Decoder
 import os
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
 
 
 def load_model(config, output_size):
@@ -30,14 +28,14 @@ def load_model(config, output_size):
     """
     encoder = EncoderXtransformer(config.input_size, config.dim , depth = config.depth)
     model_decoder = TransformerWrapper(
-    num_tokens = output_size,
-    max_seq_len = config.max_length - 1,    # max_length is 19 + 2 (start and end), here I use max_length - 1(start), since we are already passing start to transformer
-    attn_layers = Decoder(
-        dim = config.dim,
-        depth = config.depth,
-        heads = config.head,
-        cross_attend = True
-        )
+        num_tokens = output_size,
+        max_seq_len = config.max_length-1,    # max_length is 19 + 2 (start and end), here I use max_length - 1(start), since we are already passing start to transformer
+        attn_layers = Decoder(
+            dim = config.dim,
+            depth = config.depth,
+            heads = config.head,
+            cross_attend = True
+            )
     )
 
     decoder = AutoregressiveWrapper(model_decoder, ignore_index=output_size-1)
@@ -47,7 +45,7 @@ def load_model(config, output_size):
 
 class GFModel:
 
-    def __init__(self, config):
+    def __init__(self, config, device="cuda"):
         self.data_handler = DataHandler(config)
 
         self.encoder, self.decoder = load_model(config, self.data_handler.output_size)
@@ -55,22 +53,24 @@ class GFModel:
         self.decoder.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.decoder_checkpoint_name)))
         self.encoder.to(device)
         self.decoder.to(device)
-        self.encoder.eval()
-        self.decoder.eval()
+
+        self.config = config
+        self.device = device
+
 
     def run(self, input_batch):
         seq = ["<start>"]
         batch_size = len(input_batch)
         with torch.no_grad():
-            input_ = torch.tensor(input_batch).to(torch.float32).to(device)
+            input_ = torch.tensor(input_batch).to(torch.float32).to(self.device)
             encoded_input_ = self.encoder(input_)
 
-            batch_prompt = torch.zeros((batch_size, len(seq))).long().to(device)
+            batch_prompt = torch.zeros((batch_size, len(seq))).long().to(self.device)
             for i in range(batch_size):
                 for j in range(len(seq)):
                     batch_prompt[i, j] = self.data_handler.name2inx(seq[j])
 
-            out_inx = self.decoder.generate(prompts=batch_prompt, context=encoded_input_, seq_len=21-len(seq), temperature=1.0)
+            out_inx = self.decoder.generate(prompts=batch_prompt, context=encoded_input_, seq_len=self.config.max_length-len(seq)-1, temperature=1.0)
                         
             out_seq_batch = []
             out_inx_batch = []
@@ -82,7 +82,7 @@ class GFModel:
 
                 out_inx_batch.append([0] + out_inx[i].long().tolist())
 
-        return out_inx_batch, out_seq_batch 
+        return out_inx_batch, out_seq_batch
 
 
 

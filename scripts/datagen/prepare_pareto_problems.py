@@ -28,14 +28,14 @@ if __name__ == "__main__":
     pos_z_min = np.min(output_position_z)
     pos_z_max = np.max(output_position_z)
 
-    output_motion_direction = data.iloc[:num_problems, config.gf_data_req_output_motion_dir].to_list()
-    output_motion_sign = data.iloc[:num_problems, config.gf_data_req_output_motion_sign].to_list()
+    output_motion_direction = data.iloc[:num_problems, config.gf_data_req_output_motion_dir_idx].to_list()
+    output_motion_sign = data.iloc[:num_problems, config.gf_data_req_output_motion_sign_idx].to_list()
     
-    price = data.iloc[:, config.gf_data_req_price]
+    price = data.iloc[:, config.gf_data_req_price_idx]
     price_min = np.min(price)
     price_max = np.max(price)
 
-    bb_vol = data.iloc[:, config.gf_data_req_bb_volume]
+    bb_vol = data.iloc[:, config.gf_data_req_bb_volume_idx]
     bb_vol_min = np.min(bb_vol)
     bb_vol_max = np.max(bb_vol)
 
@@ -52,3 +52,5 @@ if __name__ == "__main__":
     
     with open(config.pareto_problems_data, 'wb') as f:
         pickle.dump(problems, f)
+
+    print(f"Pareto problems generated at: {config.pareto_problems_data}")

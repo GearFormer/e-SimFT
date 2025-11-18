@@ -192,3 +192,5 @@ if __name__ == "__main__":
 
     with open(data_output_path, 'wb') as f:
         pickle.dump(data_prepared, f)
+
+    print(f"Pareto problem requirement samples generated at: {data_output_path}")

@@ -15,20 +15,6 @@ from concurrent.futures import ThreadPoolExecutor
 device0 = torch.device("cuda:0")
 device1 = torch.device("cuda:1")
 
-def compute_logprobs(logits, seq):
-
-    seq = seq[:,1:]
-
-    log_probs = F.log_softmax(logits, dim=-1)
-
-    # Gather the log probabilities for the actual labels
-    selected_log_probs = torch.gather(
-        input=log_probs,
-        dim=-1,
-        index=seq.unsqueeze(-1)
-    ).squeeze(-1)
-
-    return selected_log_probs
 
 class ActorModel(nn.Module):
     def __init__(self, decoder):
@@ -59,7 +45,9 @@ class CriticModel(nn.Module):
     def forward(self, encoded_input, seq):
         _, (logits, _) = self.decoder(seq, context = encoded_input, return_outputs = True) 
 
-        out = compute_logprobs(logits, seq)
+        target = seq[:,1:]
+
+        out = compute_logprobs(logits, target)
 
         # out = self.dropout(out)
 

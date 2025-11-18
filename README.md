@@ -60,36 +60,33 @@ python scripts/datagen/gen_ric_data.py
 ### 6. (for benchmarking) Prepare Pareto problems and sampling strategies.
 
 ```
-python scripts/datagen/aug_data.py --aug_data_type pareto
+python scripts/datagen/aug_data.py --aug_data_type pareto_test
 python scripts/datagen/prepare_pareto_problems.py --pareto_exp_num_problems 30
 python scripts/datagen/prepare_pareto_samples.py --pareto_exp_num_problems 30
 ```
 
-### 7. SFT the pre-trained model w.r.t. original requirements.
+### 7. SFT the pre-trained model w.r.t. original/new requirements.
 
 ```
-python -m train_models.train_sft --train_data_path "esimft_data/sft_[pos/speed]_train.pkl" --val_data_path "esimft_data/sft_[pos/speed]_val.pkl" --BS 64 --lr 0.000001 --req_name "[pos/speed]"
+python scripts/train/train_sft.py --sft_mode original_req --req_name speed --lr 0.000001
+python scripts/train/train_sft.py --sft_mode original_req --req_name pos --lr 0.000001
+python scripts/train/train_sft.py --sft_mode new_req --lr 0.00001
+python scripts/train/train_sft.py --sft_mode ric --lr 0.000001
 ```
 
-### 8. SFT the pre-trained model w.r.t. new requirements.
-
-```
-python -m train_models.train_sft_nr --train_data_path "esimft_data/sft_obj_train.pkl" --val_data_path "esimft_data/sft_obj_val.pkl" --BS 64 --lr 0.00001 --req_name "[price/bb]"
-```
-
-### 9. DPO the SFT model w.r.t. new requirements.
+### 8. DPO the SFT model w.r.t. new requirements.
 
 ```
 python -m train_models.train_dpo --train_data_path "esimft_data/pref_[price/bb]_train.pkl" --val_data_path "esimft_data/pref_[price/bb]_val.pkl" --epoch 20 --BS 64 --lr 0.000001 --req_name "[price/bb]"
 ```
 
-### 10. PPO the SFT model w.r.t. new requirements.
+### 9. PPO the SFT model w.r.t. new requirements.
 
 ```
 python -m train_models.train_ppo --train_data_path "esimft_data/pref_[price/bb]_train.pkl" --val_data_path "esimft_data/pref_[price/bb]_val.pkl" --epoch 20 --BS 64 --lr 0.00001 --decoder_checkpoint_name "SFT_[price/bb]_decoder.dict" --req_name "[price/bb]"
 ```
 
-### 11. To evaluate the baseline and SFT models w.r.t. original requirements:
+### 10. To evaluate the baseline and SFT models w.r.t. original requirements:
 
 ```
 python eval_or.py --req_name "[pos/speed]"
@@ -98,10 +95,10 @@ python eval_or.py --decoder_checkpoint_name "SFT_[pos/speed]_decoder.dict" --req
 
 ```
 
-### 12. To evaluate the baseline, SFT models, and DPO/PPO models w.r.t. new requirements:
+### 11. To evaluate the baseline, SFT models, and DPO/PPO models w.r.t. new requirements:
 
 ```
-python aug_data.py --aug_data_type simft_new_req
+python aug_data.py --aug_data_type simft_test
 
 python eval_baseline_nr.py --req_name "[price/bb]"
 
@@ -110,32 +107,32 @@ python eval_simft_nr.py --decoder_checkpoint_name "SFT_[price/bb]_decoder.dict" 
 python eval_simft_nr.py --decoder_checkpoint_name "[DPO/PPO]_[price/bb]_[i]_decoder.dict" --req_name "[price/bb]"
 ```
 
-### 13. To find the DPO/PPO models:
+### 12. To find the DPO/PPO models:
 
 ```
 ./find_best_PO.sh
 ```
 
-### 14. (for benchmarking) Train rewards-in-context model
+### 13. (for benchmarking) Train rewards-in-context model
 
 ```
 python -m train_models.train_ric --train_data_path "esimft_data/ric_train.pkl" --val_data_path "esimft_data/ric_val.pkl" --epoch 20 --BS 64 --lr 0.000001
 ```
 
-### 15. (for benchmarking) Create rewarded-soup models. 
+### 14. (for benchmarking) Create rewarded-soup models. 
 
 ```
 python soup.py --decoder_price_checkpoint_name "[the best model found in step 12]" --decoder_bb_checkpoint_name "[the best model found in step 12]"
 ```
 
-### 16. (for benchmarking) Generate Pareto fronts
+### 15. (for benchmarking) Generate Pareto fronts
 
 ```
 python pareto_exp.py --N 30
 python pareto_exp.py --N 300
 ```
 
-### 17. (for benchmarking) Evaluate Pareto fronts
+### 16. (for benchmarking) Evaluate Pareto fronts
 
 ```
 python pareto_eval.py --pareto_exp_data_path esimft_data/pareto_data_30.pkl

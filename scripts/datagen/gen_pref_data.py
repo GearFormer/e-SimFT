@@ -16,7 +16,9 @@ if __name__ == "__main__":
     config = config()
 
     gfm = GFModel(config)
-
+    gfm.encoder.eval()
+    gfm.decoder.eval()
+    
     data = pd.read_pickle(config.pref_data)
 
     data_size = len(data.index)
