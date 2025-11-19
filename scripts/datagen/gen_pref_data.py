@@ -33,7 +33,7 @@ if __name__ == "__main__":
         row = data.iloc[i]
 
         req_input_batch = []
-        for j in range(0, config.BS):
+        for j in range(0, config.sample_size):
             req_input = []
             for k in range(config.gf_data_req_input_start_idx, config.gf_data_req_input_end_idx+1):
                 req_input.append(row.iloc[k])
@@ -42,14 +42,13 @@ if __name__ == "__main__":
         seq_idx_batch, seq_batch = gfm.run(req_input_batch)
 
         sim_input_b = []
-        for j in range(0, config.BS):
+        for j in range(0, config.sample_size):
             sim_input_b.append({
                 "id": j,
                 "gear_train_sequence": seq_batch[j]
             })
 
-        num_threads = 2
-        with ThreadPoolExecutor(max_workers=num_threads) as executor, SuppressPrint():
+        with ThreadPoolExecutor(max_workers=config.num_threads_sim) as executor, SuppressPrint():
             results = list(executor.map(run_simulator, repeat(config), sim_input_b))
 
         best_price_idx = -1

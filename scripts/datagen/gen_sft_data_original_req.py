@@ -49,12 +49,12 @@ if __name__ == "__main__":
             exit()
 
         req_input_batch = []
-        for j in range(0, config.BS):
+        for j in range(0, config.sample_size):
             req_input_batch.append(req_input)
             
         seq_idx_batch, seq_batch = gfm.run(req_input_batch)
 
-        for j in range(0, config.BS):
+        for j in range(0, config.sample_size):
             input_data = {
                 "gear_train_sequence": seq_batch[j],
                 "id": 0

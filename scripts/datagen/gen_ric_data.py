@@ -33,7 +33,7 @@ if __name__ == "__main__":
         req_input = []
         for k in range(config.gf_data_req_input_start_idx, config.gf_data_req_input_end_idx+1):
             req_input.append(row.iloc[k])
-        req_input_batch = config.BS * [req_input]
+        req_input_batch = config.sample_size * [req_input]
 
         target_speed = req_input[config.gf_data_req_speed_idx]
         target_pos = [req_input[config.gf_data_req_pos_idx[0]], req_input[config.gf_data_req_pos_idx[1]], req_input[config.gf_data_req_pos_idx[2]]]
@@ -41,7 +41,7 @@ if __name__ == "__main__":
         seq_idx_batch, seq_batch = gfm.run(req_input_batch)
 
         sim_input_b = []
-        for j in range(0, config.BS):
+        for j in range(0, config.sample_size):
             sim_input_b.append({
                 "id": j,
                 "gear_train_sequence": seq_batch[j]

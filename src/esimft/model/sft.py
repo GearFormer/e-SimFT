@@ -52,12 +52,12 @@ class SFT:
         if self.fit_new_req and new_req_list is not None:
             self.new_req_encoder_optimizer.zero_grad()
             encoded_new_req = self.new_req_encoder(new_req_list)
-            encoded_input += encoded_new_req
+            encoded_input += encoded_new_req.unsqueeze(1)
 
         if self.fit_req_weights and weights is not None:
             self.weight_encoder_optimizer.zero_grad()
             encoded_weights = self.weight_encoder(weights)
-            encoded_input += encoded_weights
+            encoded_input += encoded_weights.unsqueeze(1)
 
         target = target.long()
 
@@ -71,7 +71,7 @@ class SFT:
             self.encoder_optimizer.step()
 
         if self.fit_new_req:
-            self.encoded_new_req.step()
+            self.new_req_encoder_optimizer.step()
 
         if self.fit_req_weights:
             self.weight_encoder_optimizer.step()
@@ -91,12 +91,12 @@ class SFT:
             if self.fit_new_req and new_req_list is not None:
                 self.new_req_encoder.eval()
                 encoded_new_req = self.new_req_encoder(new_req_list)
-                encoded_input += encoded_new_req
+                encoded_input += encoded_new_req.unsqueeze(1)
 
             if self.fit_req_weights and weights is not None:
                 self.weight_encoder.eval()
                 encoded_weights = self.weight_encoder(weights)
-                encoded_input += encoded_weights
+                encoded_input += encoded_weights.unsqueeze(1)
 
             target = target.long()
 

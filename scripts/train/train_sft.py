@@ -14,7 +14,7 @@ from tqdm import tqdm
 if __name__ == "__main__":
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+    
     config = config()
 
     if config.sft_mode == "original_req":
@@ -38,11 +38,11 @@ if __name__ == "__main__":
     elif config.sft_mode == "new_req":
         train_loader = data_handler.get_sft_obj_data(config.BS, if_val=False)
         val_loader = data_handler.get_sft_obj_data(config.BS, if_val=True)        
-        sft = SFT(config, gfm, freeze_encoder=True, new_requirement=True)
+        sft = SFT(config, gfm, freeze_encoder=True, fit_new_req=True)
     elif config.sft_mode == "ric":
         train_loader = data_handler.get_sft_ric_data(config.BS, if_val=False)
         val_loader = data_handler.get_sft_ric_data(config.BS, if_val=True)        
-        sft = SFT(config, gfm, freeze_encoder=True, new_requirement=True, train_ric=True)
+        sft = SFT(config, gfm, freeze_encoder=True, fit_new_req=True, fit_req_weights=True)
 
     prev_val_loss = 1e6
     prev_encoder_state = None

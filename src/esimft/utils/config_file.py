@@ -25,6 +25,7 @@ def config():
     parser.add_argument('--output_size', type=int, default=53)
     parser.add_argument('--max_length', type=int, default=21)
     parser.add_argument('--num_threads_sim', type=int, default=10)
+    parser.add_argument('--sample_size', type=int, default=10)
 
     parser.add_argument('--gearformer_val_data', type=str, default="/app/data/gearformer_data/val_data.csv")
     parser.add_argument('--gearformer_test_data', type=str, default="/app/data/gearformer_data/test_data.csv")

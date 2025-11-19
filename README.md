@@ -34,9 +34,11 @@ This will create 4 new dataset files (pkl) in `./data/esimft_data/`
 ### 2. Create SFT data for original requirements.
 
 ```
-python scripts/datagen/gen_sft_data_original_req.py --req_name speed
-python scripts/datagen/gen_sft_data_original_req.py --req_name pos
+python scripts/datagen/gen_sft_data_original_req.py --req_name speed --sample_size 100
+python scripts/datagen/gen_sft_data_original_req.py --req_name pos --sample_size 100
 ```
+
+(needs use a large sample size to sample enough data that meet the original requirement targets)
 
 ### 3. Create SFT data for new requirements.
 
@@ -70,8 +72,8 @@ python scripts/datagen/prepare_pareto_samples.py --pareto_exp_num_problems 30
 ```
 python scripts/train/train_sft.py --sft_mode original_req --req_name speed --lr 0.000001
 python scripts/train/train_sft.py --sft_mode original_req --req_name pos --lr 0.000001
-python scripts/train/train_sft.py --sft_mode new_req --lr 0.00001
-python scripts/train/train_sft.py --sft_mode ric --lr 0.000001
+python scripts/train/train_sft.py --sft_mode new_req --req_name price --lr 0.00001
+python scripts/train/train_sft.py --sft_mode new_req --req_name bb --lr 0.00001
 ```
 
 ### 8. DPO the SFT model w.r.t. new requirements.
@@ -107,7 +109,7 @@ python eval_simft_nr.py --decoder_checkpoint_name "SFT_[price/bb]_decoder.dict" 
 python eval_simft_nr.py --decoder_checkpoint_name "[DPO/PPO]_[price/bb]_[i]_decoder.dict" --req_name "[price/bb]"
 ```
 
-### 12. To find the DPO/PPO models:
+### 12. To find the best performing DPO/PPO models:
 
 ```
 ./find_best_PO.sh
@@ -116,7 +118,7 @@ python eval_simft_nr.py --decoder_checkpoint_name "[DPO/PPO]_[price/bb]_[i]_deco
 ### 13. (for benchmarking) Train rewards-in-context model
 
 ```
-python -m train_models.train_ric --train_data_path "esimft_data/ric_train.pkl" --val_data_path "esimft_data/ric_val.pkl" --epoch 20 --BS 64 --lr 0.000001
+python scripts/train/train_sft.py --sft_mode ric --lr 0.000001
 ```
 
 ### 14. (for benchmarking) Create rewarded-soup models. 

@@ -35,7 +35,7 @@ if __name__ == "__main__":
         row = data.iloc[i]
         req_input_batch = []
             
-        for j in range(0, config.BS):
+        for j in range(0, config.sample_size):
             req_input = []
             for k in range(config.gf_data_req_input_start_idx, config.gf_data_req_input_end_idx+1):
                 req_input.append(row.iloc[k])
@@ -44,7 +44,7 @@ if __name__ == "__main__":
 
         seq_idx_batch, seq_batch = gfm.run(req_input_batch)
 
-        for j in range(0, config.BS):
+        for j in range(0, config.sample_size):
             input_data = {
                 "gear_train_sequence": seq_batch[j],
                 "id": 0
@@ -67,33 +67,6 @@ if __name__ == "__main__":
             obj_input = [price * (1+price_var), bb_vol * (1+bb_vol_var)]
 
             dataset.append((req_input, seq_idx_batch[j], obj_input))
-
-        # sim_input_b = []
-        # for j in range(0, config.BS):
-        #     sim_input_b.append({
-        #         "id": j,
-        #         "gear_train_sequence": seq_batch[j]
-        #     })
-
-        # with ThreadPoolExecutor(max_workers=config.num_threads_sim) as executor, SuppressPrint():
-        #     results = list(executor.map(run_simulator, repeat(config), sim_input_b))
-
-        # for j in range(0, config.BS):
-
-        #     if results[j]["id"] == "failed":
-        #         continue
-
-        #     price = results[j]["price"]
-        #     bb_min = results[j]["bounding_box_min"]
-        #     bb_max = results[j]["bounding_box_max"]
-        #     bb_vol = calculate_volume(bb_min, bb_max)
-
-        #     price_var = np.random.uniform(0, 0.5)
-        #     bb_vol_var = np.random.uniform(0, 0.5)
-
-        #     obj_input = [price * (1+price_var), bb_vol * (1+bb_vol_var)]
-
-        #     dataset.append((req_input, seq_idx_batch[j], obj_input))
 
     val_size = int(len(dataset) * config.sft_val_ratio)
     train_dataset = dataset[val_size:]
