@@ -183,12 +183,12 @@ if __name__ == "__main__":
 
     N = config.pareto_exp_num_problems
 
-    test_data = pd.read_pickle(config.pareto_problems_data)
+    test_data = pd.read_pickle(config.data_pareto_problems)
 
     data_prepared = prepare_req(test_data, N)
 
-    os.makedirs(config.pareto_samples_folder, exist_ok=True)
-    data_output_path = os.path.join(config.pareto_samples_folder, f"req_inputs_{N}.pkl")
+    os.makedirs(config.data_pareto_samples_folder, exist_ok=True)
+    data_output_path = os.path.join(config.data_pareto_samples_folder, f"req_inputs_{N}.pkl")
 
     with open(data_output_path, 'wb') as f:
         pickle.dump(data_prepared, f)

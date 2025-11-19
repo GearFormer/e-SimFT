@@ -16,10 +16,13 @@ if __name__ == "__main__":
     gfm.encoder.eval()
     gfm.decoder.eval()
 
-    # use both data for sft and pref finetuning
-    data1 = pd.read_pickle(config.sft_data)
-    data2 = pd.read_pickle(config.pref_data)
-    data = pd.concat([data1, data2], ignore_index=True)
+    if config.sft_mode == "original_req" or config.sft_mode == "ric":
+        # use both data for sft and pref finetuning
+        data1 = pd.read_pickle(config.data_esimft_1)
+        data2 = pd.read_pickle(config.data_esimft_2)
+        data = pd.concat([data1, data2], ignore_index=True)
+    else:
+        data = pd.read_pickle(config.data_esimft_1)
 
     data_size = len(data.index)
 
@@ -82,16 +85,13 @@ if __name__ == "__main__":
     train_dataset = dataset[val_size:]
     val_dataset = dataset[:val_size]
 
-    train_dataset_name = config.sft_data.replace(".pkl", f"_{config.req_name}_train.pkl")
-    val_dataset_name = config.sft_data.replace(".pkl", f"_{config.req_name}_val.pkl")
-
     print()
     print("storing files...")
 
     df = pd.DataFrame(train_dataset, columns=['req_input', 'chosen_seq'])
-    df.to_pickle(train_dataset_name)
+    df.to_pickle(config.data_sft_train)
     df = pd.DataFrame(val_dataset, columns=['req_input', 'chosen_seq'])
-    df.to_pickle(val_dataset_name)
+    df.to_pickle(config.data_sft_val)
 
-    print(f"SFT data for {config.req_name} saved at: {train_dataset_name} and {val_dataset_name}")
+    print(f"SFT data for {config.req_name} saved at: {config.data_sft_train} and {config.data_sft_val}")
 

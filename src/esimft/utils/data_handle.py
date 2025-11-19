@@ -32,8 +32,11 @@ class PrefDataset(torch.utils.data.Dataset):
         self.reject_seq = reject_seq.values
 
     def __getitem__(self, index):
-        return torch.Tensor(self.req_input[index]), torch.Tensor(self.chosen_seq[index]), \
-            torch.Tensor(self.reject_seq[index])
+        return {
+            "inputs": torch.Tensor(self.req_input[index]), 
+            "chosen_seq": torch.Tensor(self.chosen_seq[index]),
+            "rejected_seq": torch.Tensor(self.reject_seq[index])
+            }
 
     def __len__(self):
         return len(self.req_input)
@@ -46,8 +49,11 @@ class PrefObjDataset(torch.utils.data.Dataset):
         self.mid_value = mid_value.values
 
     def __getitem__(self, index):
-        return torch.Tensor(self.req_input[index]), torch.Tensor(self.chosen_seq[index]), \
-            torch.Tensor(self.reject_seq[index]), torch.tensor(self.mid_value[index], dtype=torch.float32)
+        return {
+            "inputs": (torch.Tensor(self.req_input[index]), torch.Tensor([self.mid_value[index]]), torch.zeros(1)),
+            "chosen_seq": torch.Tensor(self.chosen_seq[index]),
+            "rejected_seq": torch.Tensor(self.reject_seq[index]),
+            }
 
     def __len__(self):
         return len(self.req_input)
@@ -80,7 +86,10 @@ class SFTDataset(torch.utils.data.Dataset):
             self.weights = req_input.values # placeholder
 
     def __getitem__(self, index):
-        return torch.Tensor(self.req_input[index]), torch.Tensor(self.seq[index]), torch.Tensor(self.new_req[index]), torch.Tensor(self.weights[index])
+        return {
+            "inputs": (torch.Tensor(self.req_input[index]), torch.Tensor(self.new_req[index]), torch.Tensor(self.weights[index])), 
+            "seq": torch.Tensor(self.seq[index])
+            }
 
     def __len__(self):
         return len(self.req_input)

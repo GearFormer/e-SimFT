@@ -18,7 +18,7 @@ if __name__ == "__main__":
     gfm.encoder.eval()
     gfm.decoder.eval()
     
-    data = pd.read_pickle(config.ric_aug_data)
+    data = pd.read_pickle(config.data_ric_aug)
 
     data_size = len(data.index)
 
@@ -90,6 +90,6 @@ if __name__ == "__main__":
     print("storing files...")
 
     df = pd.DataFrame(train_dataset, columns=['req_input', 'seq', 'new_req', 'weights'])
-    df.to_pickle(config.ric_train_data)
+    df.to_pickle(config.data_sft_train)
     df = pd.DataFrame(val_dataset, columns=['req_input', 'seq', 'new_req', 'weights'])
-    df.to_pickle(config.ric_val_data)
+    df.to_pickle(config.data_sft_val)

@@ -45,12 +45,21 @@ def load_model(config, output_size):
 
 class GFModel:
 
-    def __init__(self, config, device="cuda"):
+    def __init__(self, config, device="cuda", encoder_checkpoint_path=None, decoder_checkpoint_path=None):
         self.data_handler = DataHandler(config)
 
         self.encoder, self.decoder = load_model(config, self.data_handler.output_size)
-        self.encoder.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.encoder_checkpoint_name)))
-        self.decoder.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.decoder_checkpoint_name)))
+
+        if encoder_checkpoint_path:
+            self.encoder.load_state_dict(torch.load(os.path.join(config.checkpoint_path, encoder_checkpoint_path)))
+        else:
+            self.encoder.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.gearformer_encoder_checkpoint_name)))
+
+        if decoder_checkpoint_path:
+            self.decoder.load_state_dict(torch.load(os.path.join(config.checkpoint_path, decoder_checkpoint_path)))
+        else:
+            self.decoder.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.gearformer_decoder_checkpoint_name)))
+        
         self.encoder.to(device)
         self.decoder.to(device)
 

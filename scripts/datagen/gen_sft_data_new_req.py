@@ -20,9 +20,7 @@ if __name__ == "__main__":
     gfm.decoder.eval()
     
     # use both data for sft and pref finetuning
-    data1 = pd.read_pickle(config.sft_data)
-    data2 = pd.read_pickle(config.pref_data)
-    data = pd.concat([data1, data2], ignore_index=True)
+    data = pd.read_pickle(config.data_esimft_1)
 
     data_size = len(data.index)
 
@@ -56,15 +54,17 @@ if __name__ == "__main__":
             if sim_results["id"] == "failed":
                 continue
 
-            price = sim_results["price"]
-            bb_min = sim_results["bounding_box_min"]
-            bb_max = sim_results["bounding_box_min"]
-            bb_vol = calculate_volume(bb_min, bb_max)
+            if config.req_name == "price":
+                price = sim_results["price"]
+                price_var = np.random.uniform(0, 0.5)
+                obj_input = [price * (1+price_var)]
 
-            price_var = np.random.uniform(0, 0.5)
-            bb_vol_var = np.random.uniform(0, 0.5)
-
-            obj_input = [price * (1+price_var), bb_vol * (1+bb_vol_var)]
+            elif config.req_name == "bb":               
+                bb_min = sim_results["bounding_box_min"]
+                bb_max = sim_results["bounding_box_max"]
+                bb_vol = calculate_volume(bb_min, bb_max)
+                bb_vol_var = np.random.uniform(0, 0.5)
+                obj_input = [bb_vol * (1+bb_vol_var)]
 
             dataset.append((req_input, seq_idx_batch[j], obj_input))
 
@@ -72,14 +72,12 @@ if __name__ == "__main__":
     train_dataset = dataset[val_size:]
     val_dataset = dataset[:val_size]
 
-    train_dataset_name = config.sft_data.replace(".pkl", f"_new_obj_train.pkl")
-    val_dataset_name = config.sft_data.replace(".pkl", f"_new_obj_val.pkl")
-
     print()
     print("storing files...")
-    print(f"SFT data for new requirements (price and bounding box) saved at: {train_dataset_name} and {val_dataset_name}")
 
-    df = pd.DataFrame(train_dataset, columns=['req_input', 'chosen_seq', 'new_req'])
-    df.to_pickle(train_dataset_name)
-    df = pd.DataFrame(val_dataset, columns=['req_input', 'chosen_seq', 'new_req'])
-    df.to_pickle(val_dataset_name)
+    df = pd.DataFrame(train_dataset, columns=['req_input', 'chosen_seq', 'new_req_value'])
+    df.to_pickle(config.data_sft_train)
+    df = pd.DataFrame(val_dataset, columns=['req_input', 'chosen_seq', 'new_req_value'])
+    df.to_pickle(config.data_sft_val)
+
+    print(f"SFT data for {config.req_name} saved at: {config.data_sft_train} and {config.data_sft_val}")

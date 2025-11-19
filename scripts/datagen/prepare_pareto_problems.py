@@ -8,7 +8,7 @@ from esimft.utils.config_file import config
 if __name__ == "__main__":
     config = config()
 
-    data = pd.read_pickle(config.pareto_test_aug_data)
+    data = pd.read_pickle(config.data_pareto_test_aug)
     num_problems = config.pareto_exp_num_problems
     
     input_motion_type = data.iloc[:num_problems, config.gf_data_req_input_motion_type_idx].to_list()
@@ -50,7 +50,7 @@ if __name__ == "__main__":
     problems = np.array((input_motion_type, output_motion_type, speeds, pos_x, pos_y, pos_z, 
                         output_motion_direction, output_motion_sign, prices, bb_vols)).T
     
-    with open(config.pareto_problems_data, 'wb') as f:
+    with open(config.data_pareto_problems, 'wb') as f:
         pickle.dump(problems, f)
 
-    print(f"Pareto problems generated at: {config.pareto_problems_data}")
+    print(f"Pareto problems generated at: {config.data_pareto_problems}")

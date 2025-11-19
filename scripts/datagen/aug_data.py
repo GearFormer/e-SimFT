@@ -13,14 +13,16 @@ if __name__ == "__main__":
     data_handler = DataHandler(config)
 
     if config.aug_data_type == "ric":
-        data = pd.read_pickle(config.pref_data)
-        save_file = config.ric_aug_data
+        data1 = pd.read_pickle(config.data_esimft_1)
+        data2 = pd.read_pickle(config.data_esimft_2)
+        data = pd.concat([data1, data2], ignore_index=True)
+        save_file = config.data_ric_aug
     elif config.aug_data_type == "pareto_test":
-        data = pd.read_pickle(config.pareto_test_data)
-        save_file = config.pareto_test_aug_data
+        data = pd.read_pickle(config.data_pareto_test)
+        save_file = config.data_pareto_test_aug
     elif config.aug_data_type == "simft_test":
-        data = pd.read_pickle(config.simft_test_data)
-        save_file = config.simft_test_aug_data
+        data = pd.read_pickle(config.data_simft_test)
+        save_file = config.data_simft_test_aug
     else:
         print("aug_data_type not specified / supported")
         exit()
