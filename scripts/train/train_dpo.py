@@ -32,7 +32,7 @@ if __name__ == "__main__":
     sft_model = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
     sft_model.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.sft_model_checkpoint_name), map_location=device))
 
-    dpo = DPO(sft_model)
+    dpo = DPO(sft_model, beta=config.dpo_beta)
 
     prev_val_loss = 1e6
     prev_model_state = None

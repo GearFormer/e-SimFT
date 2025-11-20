@@ -16,7 +16,6 @@ class DPOLoss(nn.Module):
     def __init__(
         self,
         beta: float = 0.1,
-        label_smoothing: float = 0.0,
     ):
         super().__init__()
         self.beta = beta
@@ -42,12 +41,12 @@ class DPOLoss(nn.Module):
         return loss, chosen_rewards, rejected_rewards
 
 class DPO:
-    def __init__(self, model):
+    def __init__(self, model, beta=0.1):
 
         self.model = model
         self.model_ref = copy.deepcopy(model)
 
-        self.dpo_loss = DPOLoss(beta=0.1)
+        self.dpo_loss = DPOLoss(beta=beta)
 
     def training_step(self, inputs, preferred_labels, rejected_labels):
         
