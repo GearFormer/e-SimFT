@@ -1,233 +1,19 @@
-import random
-random.seed(0)
 import numpy as np
-np.random.seed(0)
 import torch
-torch.manual_seed(0)
 import torch.nn as nn
-from train_models.utils.data_handle import load_data
-from train_models.utils.config_file import config
-from train_models.load_model import loading_model
-from train_models.utils.helper import is_grammatically_correct, is_physically_feasible
-from train_models.transformers import ObjEncoder, WeightEncoder
-from simulator.gear_train_simulator import Simulator
+from esimft.utils.config import config
+from esimft.model.gearformer import GFModel, ObjEncoder, WeightEncoder
+from esimft.model.gearformer_simft import GearFormerSimFT
+from esimft.utils.gearformer.sim import run_simulator, calculate_volume
 from esimft.utils.processing import SuppressPrint
-torch.set_printoptions(threshold=10_000)
-import matplotlib.pyplot as plt
+from esimft.utils.data_handle import DataHandler
 import pickle
-from pymoo.indicators.hv import HV
 from concurrent.futures import ThreadPoolExecutor
 import time
-from scipy.stats import ttest_ind
 from datetime import datetime
+import os
+from itertools import repeat
 
-
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-args = config()
-max_length = 21
-get_dict = load_data(args)
-input_size = 8
-
-
-class GFModel:
-
-    def __init__(self, encoder_name, decoder_name):
-        self.get_dict = load_data(args)
-
-        self.encoder, self.decoder = loading_model(args, input_size, self.get_dict.output_size, max_length)
-        self.encoder.load_state_dict(torch.load(encoder_name))
-        self.decoder.load_state_dict(torch.load(decoder_name))
-        self.encoder.to(device)
-        self.decoder.to(device)
-        self.encoder.eval()
-        self.decoder.eval()
-
-    def run(self, req_input):
-        with torch.no_grad():
-            seq = ["<start>"]
-            batch_size = len(req_input)
-            with torch.no_grad():
-                req_input = torch.tensor(req_input).to(torch.float32).to(device)
-                encoded_input = self.encoder(req_input)
-
-                batch_prompt = torch.zeros((batch_size, len(seq))).long().to(device)
-                for i in range(batch_size):
-                    for j in range(len(seq)):
-                        batch_prompt[i, j] = self.get_dict.name2inx(seq[j])
-
-                out_inx = self.decoder.generate(prompts=batch_prompt, context=encoded_input, seq_len=21-len(seq), temperature=1)
-                            
-                out_seq_batch = []
-                # out_inx_batch = []
-                for i in range(batch_size):
-                    out_seq = ["<start>"] + list(map(get_dict.inx2name, out_inx[i].cpu().tolist())) + ['<end>']
-                    target_inx = out_seq.index("<end>")
-                    out_seq = out_seq[:target_inx+1]
-                    if out_seq in out_seq_batch:
-                        out_seq_batch.append(["<start>", "<end>"])
-                    else:
-                        out_seq_batch.append(out_seq)
-                    # out_inx_batch.append([0] + out_inx[i].long().tolist())
-
-        return out_seq_batch
-
-class GFModel_obj:
-
-    def __init__(self, encoder_name, decoder_name, obj_encoder_name):
-        self.get_dict = load_data(args)
-
-        self.encoder, self.decoder = loading_model(args, input_size, self.get_dict.output_size, max_length)
-        self.obj_encoder = ObjEncoder(input_size=1, output_size=args.dim)
-        self.encoder.load_state_dict(torch.load(encoder_name))
-        self.decoder.load_state_dict(torch.load(decoder_name))
-        self.obj_encoder.load_state_dict(torch.load(obj_encoder_name))
-        self.encoder.to(device)
-        self.decoder.to(device)
-        self.obj_encoder.to(device)
-        self.encoder.eval()
-        self.decoder.eval()
-        self.obj_encoder.eval()
-
-    def run(self, req_input, obj_input):
-        with torch.no_grad():
-            seq = ["<start>"]
-            batch_size = len(req_input)
-            with torch.no_grad():
-                req_input = torch.tensor(req_input).to(torch.float32).to(device)
-                obj_input = torch.tensor(obj_input).to(torch.float32).unsqueeze(-1).to(device)
-                encoded_input = self.encoder(req_input) + self.obj_encoder(obj_input)
-
-                batch_prompt = torch.zeros((batch_size, len(seq))).long().to(device)
-                for i in range(batch_size):
-                    for j in range(len(seq)):
-                        batch_prompt[i, j] = self.get_dict.name2inx(seq[j])
-
-                out_inx = self.decoder.generate(prompts=batch_prompt, context=encoded_input, seq_len=21-len(seq), temperature=1)
-                            
-                out_seq_batch = []
-                # out_inx_batch = []
-                for i in range(batch_size):
-                    out_seq = ["<start>"] + list(map(get_dict.inx2name, out_inx[i].cpu().tolist())) + ['<end>']
-                    target_inx = out_seq.index("<end>")
-                    out_seq = out_seq[:target_inx+1]
-                    if out_seq in out_seq_batch:
-                        out_seq_batch.append(["<start>", "<end>"])
-                    else:
-                        out_seq_batch.append(out_seq)
-                    # out_inx_batch.append([0] + out_inx[i].long().tolist())
-
-        return out_seq_batch
-
-class GFModel_obj2:
-
-    def __init__(self, encoder_name, decoder_name, obj1_encoder_name, obj2_encoder_name):
-        self.get_dict = load_data(args)
-
-        self.encoder, self.decoder = loading_model(args, input_size, self.get_dict.output_size, max_length)
-        self.obj1_encoder = ObjEncoder(input_size=1, output_size=args.dim)
-        self.obj2_encoder = ObjEncoder(input_size=1, output_size=args.dim)
-
-        self.encoder.load_state_dict(torch.load(encoder_name))
-        self.decoder.load_state_dict(torch.load(decoder_name))
-        self.obj1_encoder.load_state_dict(torch.load(obj1_encoder_name))
-        self.obj2_encoder.load_state_dict(torch.load(obj2_encoder_name))
-        self.encoder.to(device)
-        self.decoder.to(device)
-        self.obj1_encoder.to(device)
-        self.obj2_encoder.to(device)
-        self.encoder.eval()
-        self.decoder.eval()
-        self.obj1_encoder.eval()
-        self.obj2_encoder.eval()
-
-    def run(self, req_input, obj1_input, obj2_input):
-        with torch.no_grad():
-            seq = ["<start>"]
-            batch_size = len(req_input)
-            with torch.no_grad():
-                req_input = torch.tensor(req_input).to(torch.float32).to(device)
-                obj1_input = torch.tensor(obj1_input).to(torch.float32).unsqueeze(-1).to(device)
-                obj2_input = torch.tensor(obj2_input).to(torch.float32).unsqueeze(-1).to(device)
-
-                encoded_input = self.encoder(req_input) + self.obj1_encoder(obj1_input) + self.obj2_encoder(obj2_input)
-
-                batch_prompt = torch.zeros((batch_size, len(seq))).long().to(device)
-                for i in range(batch_size):
-                    for j in range(len(seq)):
-                        batch_prompt[i, j] = self.get_dict.name2inx(seq[j])
-
-                out_inx = self.decoder.generate(prompts=batch_prompt, context=encoded_input, seq_len=21-len(seq), temperature=1)
-                            
-                out_seq_batch = []
-                # out_inx_batch = []
-                for i in range(batch_size):
-                    out_seq = ["<start>"] + list(map(get_dict.inx2name, out_inx[i].cpu().tolist())) + ['<end>']
-                    target_inx = out_seq.index("<end>")
-                    out_seq = out_seq[:target_inx+1]
-                    if out_seq in out_seq_batch:
-                        out_seq_batch.append(["<start>", "<end>"])
-                    else:
-                        out_seq_batch.append(out_seq)
-                    # out_inx_batch.append([0] + out_inx[i].long().tolist())
-
-        return out_seq_batch
-
-class GFModel_w:
-
-    def __init__(self, encoder_name, decoder_name, obj_encoder_name, w_encoder_name):
-        self.get_dict = load_data(args)
-
-        self.encoder, self.decoder = loading_model(args, input_size, self.get_dict.output_size, max_length)
-        self.obj_encoder = ObjEncoder(input_size=2, output_size=args.dim)
-        self.w_encoder = WeightEncoder(input_size=4, output_size=args.dim)
-
-        self.encoder.load_state_dict(torch.load(encoder_name))
-        self.decoder.load_state_dict(torch.load(decoder_name))
-        self.obj_encoder.load_state_dict(torch.load(obj_encoder_name))
-        self.w_encoder.load_state_dict(torch.load(w_encoder_name))
-
-        self.encoder.to(device)
-        self.decoder.to(device)
-        self.obj_encoder.to(device)
-        self.w_encoder.to(device)
-
-        self.encoder.eval()
-        self.decoder.eval()
-        self.obj_encoder.eval()
-        self.w_encoder.eval()
-
-    def run(self, req_input, obj_input, w_input):
-        with torch.no_grad():
-            seq = ["<start>"]
-            batch_size = len(req_input)
-            with torch.no_grad():
-                req_input = torch.tensor(req_input).to(torch.float32).to(device)
-                obj_input = torch.tensor(obj_input).to(torch.float32).to(device)
-                w_input = torch.tensor(w_input).to(torch.float32).to(device)
-                encoded_input = self.encoder(req_input) + self.obj_encoder(obj_input) + self.w_encoder(w_input)
-
-                batch_prompt = torch.zeros((batch_size, len(seq))).long().to(device)
-                for i in range(batch_size):
-                    for j in range(len(seq)):
-                        batch_prompt[i, j] = self.get_dict.name2inx(seq[j])
-
-                out_inx = self.decoder.generate(prompts=batch_prompt, context=encoded_input, seq_len=21-len(seq), temperature=1)
-                            
-                out_seq_batch = []
-                # out_inx_batch = []
-                for i in range(batch_size):
-                    out_seq = ["<start>"] + list(map(get_dict.inx2name, out_inx[i].cpu().tolist())) + ['<end>']
-                    target_inx = out_seq.index("<end>")
-                    out_seq = out_seq[:target_inx+1]
-                    if out_seq in out_seq_batch:
-                        out_seq_batch.append(["<start>", "<end>"])
-                    else:
-                        out_seq_batch.append(out_seq)
-                    # out_inx_batch.append([0] + out_inx[i].long().tolist())
-
-        return out_seq_batch
-    
 
 def pareto_frontier(points):
     """
@@ -250,40 +36,27 @@ def pareto_frontier(points):
     
     return list(pareto_set)
 
+def prepare_inputs_and_prompts(orig_reqs):
+    orig_req_inputs = torch.tensor(orig_reqs, dtype=torch.float32, device=device)
+    inputs = (orig_req_inputs, )
 
-def calculate_volume(min_corner, max_corner):
-    # Unpack the corners
-    min_x, min_y, min_z = min_corner
-    max_x, max_y, max_z = max_corner
+    start_token = 0
+    prompts = torch.full(
+        (orig_req_inputs.shape[0], 1),
+        fill_value=start_token,
+        dtype=torch.long,
+        device=device,
+    )
+
+    return inputs, prompts
     
-    # Calculate the dimensions
-    length = max_x - min_x
-    width = max_y - min_y
-    height = max_z - min_z
-    
-    # Compute the volume
-    volume = length * width * height
-    return volume
-
-def run_simulator(sim_input):
-
-    simulator = Simulator()
-
-    if len(sim_input["gear_train_sequence"]) < 4:
-        return {"id": "failed"}
-
-    if not is_grammatically_correct(args, sim_input["gear_train_sequence"]):
-        return {"id": "failed"}
-
-    if not is_physically_feasible(sim_input["gear_train_sequence"], args.catalogue_path):
-        return {"id": "failed"}
-
-    try:
-        results = simulator.run(sim_input)
-    except:
-        results = {"id": "failed"}
-    
-    return results
+def translate_output(ouptuts, data_handler):
+    solutions = []
+    for pred in ouptuts:
+        out_seq = ["<start>"] + list(map(data_handler.inx2name, pred.cpu().tolist())) + ['<end>']
+        target_inx = out_seq.index("<end>")
+        out_seq = out_seq[:target_inx+1]
+        solutions.append(out_seq)
 
 def eval_solutions(solutions):
 
@@ -294,17 +67,13 @@ def eval_solutions(solutions):
                 "gear_train_sequence": solutions[i]
         })
 
-    num_threads = 32
-    with ThreadPoolExecutor(max_workers=num_threads) as executor, SuppressPrint():
-        results = list(executor.map(run_simulator, sim_inputs))
+    with ThreadPoolExecutor(max_workers=config.num_threads_sim) as executor, SuppressPrint():
+        results = list(executor.map(run_simulator, repeat(config), sim_inputs))
 
     return results
 
 def find_obj_pairs(sim_results, req_input, scenario):
 
-    # scenarios = ["speed_pos", "speed_price", "speed_bb", "pos_price", "pos_bb", "price_bb",
-    #              "speed_pos_bb", "speed_pos_price", "speed_bb_price", "pos_price_bb"]
-    
     obj_pairs = []
 
     for i in range(0, len(sim_results)):
@@ -355,9 +124,6 @@ def find_obj_pairs(sim_results, req_input, scenario):
 
 def find_obj_triples(sim_results, req_input, scenario):
 
-    # scenarios = ["speed_pos", "speed_price", "speed_bb", "pos_price", "pos_bb", "price_bb",
-    #              "speed_pos_bb", "speed_pos_price", "speed_bb_price", "pos_price_bb"]
-    
     obj_trips = []
 
     for i in range(0, len(req_input)):
@@ -405,42 +171,46 @@ def find_obj_triples(sim_results, req_input, scenario):
 
 if __name__ == "__main__":
 
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    config = config()
+    data_handler = DataHandler(config)
 
     ref_points = {}
-    ref_points["speed"] = 18690.32805080772
-    ref_points["pos"] = 1.3493602375473808
-    ref_points["price"] = 2374.112880506438
-    ref_points["bb"] = 0.26230808838936703
+    ref_points["speed"] = config.ref_pareto_speed
+    ref_points["pos"] = config.ref_pareto_pos
+    ref_points["price"] = config.ref_pareto_price
+    ref_points["bb"] = config.ref_pareto_bb
 
-    N = args.N
+    N = config.pareto_num_samples
 
-    with open('esimft_data/req_inputs_' + str(N) + '.pkl', 'rb') as f:
+    with open(os.path.join("esimft_data", config.pareto_exp_data_path, f"req_inputs_{N}.pkl"), 'rb') as f:
         req_inputs = pickle.load(f)
 
-    methods = ["base", "sim", "eps", "eps_sim", "soup", "ric"]
-    scenarios = ["speed_pos", "speed_price", "speed_bb", "pos_price", "pos_bb", "price_bb",
-                 "speed_pos_price", "speed_pos_bb", "speed_bb_price", "pos_price_bb"]
+    methods = config.test_methods
+    scenarios = config.test_scenarios
+    num_tests = config.pareto_exp_num_problems
 
-    num_tests = 30
-
-    data_fname = "esimft_data/pareto_data_" + str(N) + ".pkl"
+    data_fname = os.path.join("esimft_data", config.pareto_exp_data_path, f"pareto_data_{N}.pkl")
     results = {}
     for s in scenarios:
         results[s] = {}
         for m in methods:
             results[s][m] = {}
-    # with open(data_fname, "rb") as f:
-    #     results = pickle.load(f)
-    # f.close()
+
+    gfm = GFModel(config, device, encoder_checkpoint_path=config.gearformer_encoder_checkpoint_name, 
+                  decoder_checkpoint_path=config.gearformer_decoder_checkpoint_name)
+    encoder = gfm.encoder
+    decoder = gfm.decoder
+    new_req_encoder = ObjEncoder(input_size=1, output_size=config.dim).to(device)
+    weight_encoder = WeightEncoder(input_size=4, output_size=config.dim).to(device)
+    
+    model = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
 
     for m in methods:
-        print(m)
+        print(f"Testing method {m}")
 
         if m == "base":
-            encoder_path = "/app/train_models/models/GearFormer_0.0001_18_encoder.dict"
-            decoder_path = "/app/train_models/models/GearFormer_0.0001_18_decoder.dict"
-            gfm = GFModel(encoder_path, decoder_path)
-
             for s in scenarios:
                 t0 = time.time()
                 print(s)
@@ -477,10 +247,6 @@ if __name__ == "__main__":
                 f.close()
 
         elif m == "eps":
-            encoder_path = "/app/train_models/models/GearFormer_0.0001_18_encoder.dict"
-            decoder_path = "/app/train_models/models/GearFormer_0.0001_18_decoder.dict"
-            gfm = GFModel(encoder_path, decoder_path)
-
             for s in scenarios:
                 t0 = time.time()
                 print(s)
@@ -585,13 +351,13 @@ if __name__ == "__main__":
                 num_pareto = []
                 pareto = []
 
-                encoder_path = "/app/train_models/models/GearFormer_0.0001_18_encoder.dict"
-
                 if s == "speed_pos": 
-                    decoder1_path = "/app/train_models/models/SFT_speed_decoder.dict"
-                    gfm1 = GFModel(encoder_path, decoder1_path)
-                    decoder2_path = "/app/train_models/models/SFT_pos_decoder.dict"
-                    gfm2 = GFModel(encoder_path, decoder2_path)
+
+                    model_1 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, device=device)
+                    model_1.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.speed_model_checkpoint_name), map_location=device))
+
+                    model_2 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, device=device)
+                    model_2.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.pos_model_checkpoint_name), map_location=device))
 
                     for i in range(0, num_tests):
                         print(i)
@@ -600,11 +366,15 @@ if __name__ == "__main__":
                         r1_orig = r1[:,:8]
                         r2 = req[int(N/2):]
                         r2_orig = r2[:,:8]
-
-                        pred_seq1 = gfm1.run(r1_orig)
-                        pred_seq2 = gfm2.run(r2_orig)
+                        
+                        inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
+                        pred_seq1 = model_1.gnerate(inputs1, prompts1)
                         sim_results1 = eval_solutions(pred_seq1)
+
+                        inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig)
+                        pred_seq2 = model_2.gnerate(inputs2, prompts2)
                         sim_results2 = eval_solutions(pred_seq2)
+                        
                         obj_set = find_obj_pairs(sim_results1, r1, s) + find_obj_pairs(sim_results2, r2, s)
                         pareto_points = np.array(pareto_frontier(np.array(obj_set)))
 

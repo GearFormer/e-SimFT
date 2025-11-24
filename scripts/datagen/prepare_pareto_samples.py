@@ -181,7 +181,7 @@ def prepare_req(data, N):
 if __name__ == "__main__":
     config = config()
 
-    N = config.pareto_exp_num_problems
+    N = config.pareto_num_samples
 
     test_data = pd.read_pickle(config.data_pareto_problems)
 

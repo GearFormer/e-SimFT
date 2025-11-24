@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from esimft.utils.data_handle import DataHandler
-from esimft.utils.config_file_soup import config
+from esimft.utils.config_file import config
 from esimft.model.gearformer import GFModel, ObjEncoder
 from esimft.model.gearformer_simft import GearFormerSimFT
 import os
