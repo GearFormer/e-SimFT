@@ -64,7 +64,7 @@ def config():
     # mode params
     parser.add_argument('--req_name', type=str, default="speed", choices=["speed", "pos", "price", "bb"])
     parser.add_argument('--aug_data_type', type=str, default="ric", choices=["ric", "pareto_test", "simft_test"])
-    parser.add_argument('--sft_mode', type=str, default="original_req", choices=["original_req", "new_req", "ric"])
+    parser.add_argument('--sft_mode', type=str, default="original_req", choices=["baseline", "original_req", "new_req", "ric"])
 
     # training params
     parser.add_argument('--epoch', type=int, default=100, help = "number of epochs")

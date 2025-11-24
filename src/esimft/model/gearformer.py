@@ -71,7 +71,7 @@ class GFModel:
         seq = ["<start>"]
         batch_size = len(input_batch)
         with torch.no_grad():
-            input_ = torch.tensor(input_batch).to(torch.float32).to(self.device)
+            input_ = torch.tensor(input_batch).to(torch.float).to(self.device)
             encoded_input_ = self.encoder(input_)
 
             batch_prompt = torch.zeros((batch_size, len(seq))).long().to(self.device)

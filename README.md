@@ -103,53 +103,56 @@ python scripts/train/train_ppo.py --data_pref_train data/esimft_data/pref_price_
 python scripts/train/train_ppo.py --data_pref_train data/esimft_data/pref_bb_train.pkl --data_pref_val data/esimft_data/pref_bb_val.pkl --epoch 20 --sft_model_checkpoint_name sft_bb.dict --ppo_model_checkpoint_folder ppo_bb
 ```
 
-### 10. To evaluate the baseline and SFT models w.r.t. original requirements:
-
-```
-python eval_or.py --req_name "[pos/speed]"
-
-python eval_or.py --decoder_checkpoint_name "SFT_[pos/speed]_decoder.dict" --req_name "[pos/speed]"
-
-```
-
-### 11. To evaluate the baseline, SFT models, and DPO/PPO models w.r.t. new requirements:
+### 10. To evaluate the baseline, SFT, and DPO/PPO models:
 
 ```
 python aug_data.py --aug_data_type simft_test
 
-python eval_baseline_nr.py --req_name "[price/bb]"
+python scripts/eval/eval_simft.py --req_name speed --sft_mode baseline
+python scripts/eval/eval_simft.py --req_name pos --sft_mode baseline
+python scripts/eval/eval_simft.py --req_name price --sft_mode baseline
+python scripts/eval/eval_simft.py --req_name bb --sft_mode baseline
 
-python eval_simft_nr.py --decoder_checkpoint_name "SFT_[price/bb]_decoder.dict" --req_name "[price/bb]"
+python scripts/eval/eval_simft.py --req_name speed --sft_mode original_req --sft_model_checkpoint_name sft_speed.dict 
+python scripts/eval/eval_simft.py --req_name pos --sft_mode original_req --sft_model_checkpoint_name sft_pos.dict
+python scripts/eval/eval_simft.py --req_name price --sft_mode new_req --sft_model_checkpoint_name sft_price.dict
+python scripts/eval/eval_simft.py --req_name bb --sft_mode new_req --sft_model_checkpoint_name sft_bb.dict
 
-python eval_simft_nr.py --decoder_checkpoint_name "[DPO/PPO]_[price/bb]_[i]_decoder.dict" --req_name "[price/bb]"
+python scripts/eval/eval_simft.py --req_name price --sft_mode new_req --sft_model_checkpoint_name dpo_price/epoch_{i}.dict
+python scripts/eval/eval_simft.py --req_name bb --sft_mode new_req --sft_model_checkpoint_name dpo_bb/epoch_{i}.dict
+
+python scripts/eval/eval_simft.py --req_name price --sft_mode new_req --sft_model_checkpoint_name ppo_price/epoch_{i}.dict
+python scripts/eval/eval_simft.py --req_name bb --sft_mode new_req --sft_model_checkpoint_name ppo_bb/epoch_{i}.dict
 ```
 
-### 12. To find the best performing DPO/PPO models:
+### 11. To find the best performing DPO/PPO models:
 
 ```
-./find_best_PO.sh
+cd scripts/eval
+./find_best_PO.sh {max_epoch_num}
 ```
 
-### 13. (for benchmarking) Train rewards-in-context model
+### 12. (for benchmarking) Train rewards-in-context model
 
 ```
-python scripts/train/train_sft.py --sft_mode ric --lr 0.000001
+python scripts/train/train_sft.py --sft_mode ric --data_sft_train data/esimft_data/ric_train.pkl --data_sft_val data/esimft_data/ric_val.pkl --lr 0.000001 --sft_model_checkpoint_name ric.dict
 ```
 
-### 14. (for benchmarking) Create rewarded-soup models. 
+### 13. (for benchmarking) Create rewarded-soup models. 
 
 ```
-python soup.py --decoder_price_checkpoint_name "[the best model found in step 12]" --decoder_bb_checkpoint_name "[the best model found in step 12]"
+python scripts/eval/create_soup.py --speed_checkpoint checkpoints/sft_speed.dict --pos_checkpoint checkpoints/sft_pos.dict --price_checkpoint checkpoints/ppo_price/epoch_{i}.dict --bb_checkpoint checkpoints/ppo_bb/epoch_{j}.dict
 ```
+(specify the best dpo/ppo models found in steps 10-11)
 
-### 15. (for benchmarking) Generate Pareto fronts
+### 14. (for benchmarking) Generate Pareto fronts
 
 ```
 python pareto_exp.py --N 30
 python pareto_exp.py --N 300
 ```
 
-### 16. (for benchmarking) Evaluate Pareto fronts
+### 15. (for benchmarking) Evaluate Pareto fronts
 
 ```
 python pareto_eval.py --pareto_exp_data_path esimft_data/pareto_data_30.pkl
