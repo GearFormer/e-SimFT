@@ -1,183 +1,114 @@
-import random
-random.seed(0)
 import numpy as np
-np.random.seed(0)
 import torch
-torch.manual_seed(0)
 import torch.nn as nn
-from train_models.utils.data_handle import load_data
-from train_models.utils.config_file_soup import config
-from train_models.load_model import loading_model
-torch.set_printoptions(threshold=10_000)
+from esimft.utils.data_handle import DataHandler
+from esimft.utils.config_file_soup import config
+from esimft.model.gearformer import GFModel, ObjEncoder
+from esimft.model.gearformer_simft import GearFormerSimFT
 import os
 
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
 if __name__ == "__main__":
 
-    args = config()
-    max_length = 21
-    get_dict = load_data(args)
-    input_size = 8
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    encoder_path = os.path.join(args.checkpoint_path, args.encoder_checkpoint_name)
-    encoder_price = os.path.join(args.checkpoint_path, args.encoder_price_checkpoint_name)
-    encoder_bb = os.path.join(args.checkpoint_path, args.encoder_bb_checkpoint_name)
-    decoder_speed = os.path.join(args.checkpoint_path, args.decoder_speed_checkpoint_name)
-    decoder_pos = os.path.join(args.checkpoint_path, args.decoder_pos_checkpoint_name)
-    decoder_price = os.path.join(args.checkpoint_path, args.decoder_price_checkpoint_name)
-    decoder_bb = os.path.join(args.checkpoint_path, args.decoder_bb_checkpoint_name)
+    config = config()
 
-    scenarios = ["speed_pos", "speed_price", "speed_bb", "pos_price", "pos_bb", "price_bb", 
-                 "speed_pos_bb", "speed_pos_price", "speed_bb_price", "pos_price_bb"]
+    scenarios = config.test_scenarios
 
-    _, decoder1 = loading_model(args, input_size, get_dict.output_size, max_length)
-    _, decoder2 = loading_model(args, input_size, get_dict.output_size, max_length)
-    _, decoder3 = loading_model(args, input_size, get_dict.output_size, max_length)
-    _, decoder_soup = loading_model(args, input_size, get_dict.output_size, max_length)
+    gfm = GFModel(config, device)
+    encoder = gfm.encoder
+    decoder = gfm.decoder
+    new_req_encoder = ObjEncoder(input_size=1, output_size=config.dim).to(device)
+
+    model_1 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+    model_2 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+    model_3 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+    soup_model = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+
+    soup_model_path = os.path.join(config.checkpoint_path, "soup_models")
+    os.makedirs(soup_model_path, exist_ok=True)
 
     for s in scenarios:
+        req_list = s.split("_")
+        num_test_reqs = len(req_list)
 
-        if len(s.split("_")) == 2:
-            w1 = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
-            w2 = [1.0, 0.8, 0.6, 0.4, 0.2, 0.0]
-        else:
-            w1 = [0.0, 0.0, 1.0, 0.5, 0.0, 0.5, 0.33]
-            w2 = [0.0, 1.0, 0.0, 0.5, 0.5, 0.0, 0.33]
-            w3 = [1.0, 0.0, 0.0, 0.0, 0.5, 0.5, 0.33]
+        if req_list[0] == "speed":
+            model_1 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, device=device)
+            model_1.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.speed_model_checkpoint_name), map_location=device))
 
-        if s == "speed_pos":
-            decoder1.load_state_dict(torch.load(decoder_speed))
-            decoder2.load_state_dict(torch.load(decoder_pos))
+        elif req_list[0] == "pos":
+            model_1 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, device=device)
+            model_1.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.pos_model_checkpoint_name), map_location=device))
+
+        elif req_list[0] == "price":
+            model_1 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+            model_1.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.price_model_checkpoint_name), map_location=device))
+
+        elif req_list[0] == "bb":
+            model_1 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+            model_1.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.bb_model_checkpoint_name), map_location=device))
+
+        if req_list[1] == "speed":
+            model_2 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, device=device)
+            model_2.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.speed_model_checkpoint_name), map_location=device))
+
+        elif req_list[1] == "pos":
+            model_2 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, device=device)
+            model_2.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.pos_model_checkpoint_name), map_location=device))
+
+        elif req_list[1] == "price":
+            model_2 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+            model_2.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.price_model_checkpoint_name), map_location=device))
+
+        elif req_list[1] == "bb":
+            model_2 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+            model_2.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.bb_model_checkpoint_name), map_location=device))
+
+        if num_test_reqs == 2:
+            w1 = config.two_reqs_weights_1
+            w2 = config.two_reqs_weights_2
 
             for i in range(len(w1)):
 
                 with torch.no_grad():
-                    for param1, param2, param_combined in zip(decoder1.parameters(), decoder2.parameters(), decoder_soup.parameters()):
+                    for param1, param2, param_combined in zip(model_1.parameters(), model_2.parameters(), soup_model.parameters()):
                         param_combined.data = w1[i] * param1.data + w2[i] * param2.data
 
-                decoder_soup_name = "soup_speed_" + str(w1[i]) + "_pos_" + str(w2[i]) + "_decoder.dict"
-                torch.save(decoder_soup.state_dict(), os.path.join(args.checkpoint_path, decoder_soup_name))
+                soup_model_name = f"soup_{req_list[0]}_{w1[i]}_{req_list[1]}_{w2[i]}.dict"
+                torch.save(soup_model.state_dict(), os.path.join(soup_model_path, soup_model_name))
+                print(f"{soup_model_name} saved.")
+                print()
+      
+        elif num_test_reqs == 3:
 
-        elif s == "speed_price":
-            decoder1.load_state_dict(torch.load(decoder_speed))
-            decoder2.load_state_dict(torch.load(decoder_price))
+            if req_list[2] == "speed":
+                model_3 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, device=device)
+                model_3.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.speed_model_checkpoint_name), map_location=device))
 
-            for i in range(len(w1)):
+            elif req_list[2] == "pos":
+                model_3 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, device=device)
+                model_3.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.pos_model_checkpoint_name), map_location=device))
 
-                with torch.no_grad():
-                    for param1, param2, param_combined in zip(decoder1.parameters(), decoder2.parameters(), decoder_soup.parameters()):
-                        param_combined.data = w1[i] * param1.data + w2[i] * param2.data
+            elif req_list[2] == "price":
+                model_3 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                model_3.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.price_model_checkpoint_name), map_location=device))
 
-                decoder_soup_name = "soup_speed_" + str(w1[i]) + "_price_" + str(w2[i]) + "_decoder.dict"
-                torch.save(decoder_soup.state_dict(), os.path.join(args.checkpoint_path, decoder_soup_name))
-
-        elif s == "speed_bb":
-            decoder1.load_state_dict(torch.load(decoder_speed))
-            decoder2.load_state_dict(torch.load(decoder_bb))
-
-            for i in range(len(w1)):
-
-                with torch.no_grad():
-                    for param1, param2, param_combined in zip(decoder1.parameters(), decoder2.parameters(), decoder_soup.parameters()):
-                        param_combined.data = w1[i] * param1.data + w2[i] * param2.data
-
-                decoder_soup_name = "soup_speed_" + str(w1[i]) + "_bb_" + str(w2[i]) + "_decoder.dict"
-                torch.save(decoder_soup.state_dict(), os.path.join(args.checkpoint_path, decoder_soup_name))
-
-        elif s == "pos_price":
-            decoder1.load_state_dict(torch.load(decoder_pos))
-            decoder2.load_state_dict(torch.load(decoder_price))
+            elif req_list[2] == "bb":
+                model_3 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                model_3.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.bb_model_checkpoint_name), map_location=device))
+                
+            w1 = config.three_reqs_weights_1
+            w2 = config.three_reqs_weights_2            
+            w3 = config.three_reqs_weights_3            
 
             for i in range(len(w1)):
 
                 with torch.no_grad():
-                    for param1, param2, param_combined in zip(decoder1.parameters(), decoder2.parameters(), decoder_soup.parameters()):
-                        param_combined.data = w1[i] * param1.data + w2[i] * param2.data
-
-                decoder_soup_name = "soup_pos_" + str(w1[i]) + "_price_" + str(w2[i]) + "_decoder.dict"
-                torch.save(decoder_soup.state_dict(), os.path.join(args.checkpoint_path, decoder_soup_name))        
-        
-        elif s == "pos_bb":
-            decoder1.load_state_dict(torch.load(decoder_pos))
-            decoder2.load_state_dict(torch.load(decoder_bb))
-
-            for i in range(len(w1)):
-
-                with torch.no_grad():
-                    for param1, param2, param_combined in zip(decoder1.parameters(), decoder2.parameters(), decoder_soup.parameters()):
-                        param_combined.data = w1[i] * param1.data + w2[i] * param2.data
-
-                decoder_soup_name = "soup_pos_" + str(w1[i]) + "_bb_" + str(w2[i]) + "_decoder.dict"
-                torch.save(decoder_soup.state_dict(), os.path.join(args.checkpoint_path, decoder_soup_name))        
-
-        elif s == "price_bb":
-            decoder1.load_state_dict(torch.load(decoder_price))
-            decoder2.load_state_dict(torch.load(decoder_bb))
-
-            for i in range(len(w1)):
-
-                with torch.no_grad():
-                    for param1, param2, param_combined in zip(decoder1.parameters(), decoder2.parameters(), decoder_soup.parameters()):
-                        param_combined.data = w1[i] * param1.data + w2[i] * param2.data
-
-                decoder_soup_name = "soup_price_" + str(w1[i]) + "_bb_" + str(w2[i]) + "_decoder.dict"
-                torch.save(decoder_soup.state_dict(), os.path.join(args.checkpoint_path, decoder_soup_name))       
-        
-        elif s == "speed_pos_bb":
-            decoder1.load_state_dict(torch.load(decoder_speed))
-            decoder2.load_state_dict(torch.load(decoder_pos))
-            decoder3.load_state_dict(torch.load(decoder_bb))
-
-            for i in range(len(w1)):
-
-                with torch.no_grad():
-                    for param1, param2, param3, param_combined in zip(decoder1.parameters(), decoder2.parameters(), decoder3.parameters(), decoder_soup.parameters()):
+                    for param1, param2, param3, param_combined in zip(model_1.parameters(), model_2.parameters(), model_3.parameters(), soup_model.parameters()):
                         param_combined.data = w1[i] * param1.data + w2[i] * param2.data + w3[i] * param3.data
 
-                decoder_soup_name = "soup_speed_" + str(w1[i]) + "_pos_" + str(w2[i]) + "_bb_" + str(w3[i])  + "_decoder.dict"
-                torch.save(decoder_soup.state_dict(), os.path.join(args.checkpoint_path, decoder_soup_name))   
-
-        elif s == "speed_pos_price":
-            decoder1.load_state_dict(torch.load(decoder_speed))
-            decoder2.load_state_dict(torch.load(decoder_pos))
-            decoder3.load_state_dict(torch.load(decoder_price))
-
-            for i in range(len(w1)):
-
-                with torch.no_grad():
-                    for param1, param2, param3, param_combined in zip(decoder1.parameters(), decoder2.parameters(), decoder3.parameters(), decoder_soup.parameters()):
-                        param_combined.data = w1[i] * param1.data + w2[i] * param2.data + w3[i] * param3.data
-
-                decoder_soup_name = "soup_speed_" + str(w1[i]) + "_pos_" + str(w2[i]) + "_price_" + str(w3[i])  + "_decoder.dict"
-                torch.save(decoder_soup.state_dict(), os.path.join(args.checkpoint_path, decoder_soup_name))   
-
-        elif s == "speed_bb_price":
-            decoder1.load_state_dict(torch.load(decoder_speed))
-            decoder2.load_state_dict(torch.load(decoder_bb))
-            decoder3.load_state_dict(torch.load(decoder_price))
-
-            for i in range(len(w1)):
-
-                with torch.no_grad():
-                    for param1, param2, param3, param_combined in zip(decoder1.parameters(), decoder2.parameters(), decoder3.parameters(), decoder_soup.parameters()):
-                        param_combined.data = w1[i] * param1.data + w2[i] * param2.data + w3[i] * param3.data
-
-                decoder_soup_name = "soup_speed_" + str(w1[i]) + "_bb_" + str(w2[i]) + "_price_" + str(w3[i])  + "_decoder.dict"
-                torch.save(decoder_soup.state_dict(), os.path.join(args.checkpoint_path, decoder_soup_name))   
-
-        elif s == "pos_price_bb":
-            decoder1.load_state_dict(torch.load(decoder_pos))
-            decoder2.load_state_dict(torch.load(decoder_price))
-            decoder3.load_state_dict(torch.load(decoder_bb))
-
-            for i in range(len(w1)):
-
-                with torch.no_grad():
-                    for param1, param2, param3, param_combined in zip(decoder1.parameters(), decoder2.parameters(), decoder3.parameters(), decoder_soup.parameters()):
-                        param_combined.data = w1[i] * param1.data + w2[i] * param2.data + w3[i] * param3.data
-
-                decoder_soup_name = "soup_pos_" + str(w1[i]) + "_price_" + str(w2[i]) + "_bb_" + str(w3[i])  + "_decoder.dict"
-                torch.save(decoder_soup.state_dict(), os.path.join(args.checkpoint_path, decoder_soup_name))   
-
+                soup_model_name = f"soup_{req_list[0]}_{w1[i]}_{req_list[1]}_{w2[i]}_{req_list[2]}_{w3[i]}.dict"
+                torch.save(soup_model.state_dict(), os.path.join(soup_model_path, soup_model_name))   
+                print(f"{soup_model_name} saved.")
+                print()
