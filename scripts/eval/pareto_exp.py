@@ -36,9 +36,14 @@ def pareto_frontier(points):
     
     return list(pareto_set)
 
-def prepare_inputs_and_prompts(orig_reqs):
-    orig_req_inputs = torch.tensor(orig_reqs, dtype=torch.float32, device=device)
-    inputs = (orig_req_inputs, )
+def prepare_inputs_and_prompts(orig_reqs, new_reqs=None):
+
+    if new_reqs is not None:
+        new_req_inputs = torch.tensor(new_req, dtype=torch.float32, device=device)
+        inputs = (orig_req_inputs, new_req_inputs)
+    else:
+        orig_req_inputs = torch.tensor(orig_reqs, dtype=torch.float32, device=device)
+        inputs = (orig_req_inputs, )
 
     start_token = 0
     prompts = torch.full(
@@ -57,6 +62,7 @@ def translate_output(ouptuts, data_handler):
         target_inx = out_seq.index("<end>")
         out_seq = out_seq[:target_inx+1]
         solutions.append(out_seq)
+    return solutions
 
 def eval_solutions(solutions):
 
@@ -368,11 +374,13 @@ if __name__ == "__main__":
                         r2_orig = r2[:,:8]
                         
                         inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
-                        pred_seq1 = model_1.gnerate(inputs1, prompts1)
+                        ouptuts1 = model_1.gnerate(inputs1, prompts1)
+                        pred_seq1 = translate_output(outputs1)
                         sim_results1 = eval_solutions(pred_seq1)
 
                         inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig)
-                        pred_seq2 = model_2.gnerate(inputs2, prompts2)
+                        ouptuts2 = model_2.gnerate(inputs2, prompts2)
+                        pred_seq2 = translate_output(outputs2)
                         sim_results2 = eval_solutions(pred_seq2)
                         
                         obj_set = find_obj_pairs(sim_results1, r1, s) + find_obj_pairs(sim_results2, r2, s)
@@ -382,11 +390,11 @@ if __name__ == "__main__":
                         pareto.append(pareto_points)
 
                 elif s == "speed_price":
-                    decoder1_path = "/app/train_models/models/SFT_speed_decoder.dict"
-                    gfm1 = GFModel(encoder_path, decoder1_path)
-                    decoder2_path = "/app/train_models/models/DPO_price_12_decoder.dict"
-                    obj_encoder_path = "/app/train_models/models/SFT_price_new_encoder.dict"
-                    gfm2 = GFModel_obj(encoder_path, decoder2_path, obj_encoder_path)
+                    model_1 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, device=device)
+                    model_1.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.speed_model_checkpoint_name), map_location=device))
+
+                    model_2 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                    model_2.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.price_model_checkpoint_name), map_location=device))
 
                     for i in range(0, num_tests):
                         print(i)
@@ -397,10 +405,16 @@ if __name__ == "__main__":
                         r2_orig = r2[:,:8]
                         r2_new = r2[:,8]
 
-                        pred_seq1 = gfm1.run(r1_orig)
-                        pred_seq2 = gfm2.run(r2_orig, r2_new)
+                        inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
+                        ouptuts1 = model_1.gnerate(inputs1, prompts1)
+                        pred_seq1 = translate_output(outputs1)
                         sim_results1 = eval_solutions(pred_seq1)
+
+                        inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig, r2_new)
+                        ouptuts2 = model_2.gnerate(inputs2, prompts2)
+                        pred_seq2 = translate_output(outputs2)
                         sim_results2 = eval_solutions(pred_seq2)
+
                         obj_set = find_obj_pairs(sim_results1, r1, s) + find_obj_pairs(sim_results2, r2, s)
                         pareto_points = np.array(pareto_frontier(np.array(obj_set)))
 
@@ -408,11 +422,11 @@ if __name__ == "__main__":
                         pareto.append(pareto_points)
 
                 elif s == "speed_bb":
-                    decoder1_path = "/app/train_models/models/SFT_speed_decoder.dict"
-                    gfm1 = GFModel(encoder_path, decoder1_path)
-                    decoder2_path = "/app/train_models/models/DPO_bb_11_decoder.dict"
-                    obj_encoder_path = "/app/train_models/models/SFT_bb_new_encoder.dict"
-                    gfm2 = GFModel_obj(encoder_path, decoder2_path, obj_encoder_path)
+                    model_1 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, device=device)
+                    model_1.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.speed_model_checkpoint_name), map_location=device))
+
+                    model_2 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                    model_2.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.bb_model_checkpoint_name), map_location=device))
 
                     for i in range(0, num_tests):
                         print(i)
@@ -423,10 +437,16 @@ if __name__ == "__main__":
                         r2_orig = r2[:,:8]
                         r2_new = r2[:,9]
 
-                        pred_seq1 = gfm1.run(r1_orig)
-                        pred_seq2 = gfm2.run(r2_orig, r2_new)
+                        inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
+                        ouptuts1 = model_1.gnerate(inputs1, prompts1)
+                        pred_seq1 = translate_output(outputs1)
                         sim_results1 = eval_solutions(pred_seq1)
+
+                        inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig, r2_new)
+                        ouptuts2 = model_2.gnerate(inputs2, prompts2)
+                        pred_seq2 = translate_output(outputs2)
                         sim_results2 = eval_solutions(pred_seq2)
+
                         obj_set = find_obj_pairs(sim_results1, r1, s) + find_obj_pairs(sim_results2, r2, s)
                         pareto_points = np.array(pareto_frontier(np.array(obj_set)))
 
@@ -434,11 +454,11 @@ if __name__ == "__main__":
                         pareto.append(pareto_points)
 
                 elif s == "pos_price":
-                    decoder1_path = "/app/train_models/models/SFT_pos_decoder.dict"
-                    gfm1 = GFModel(encoder_path, decoder1_path)
-                    decoder2_path = "/app/train_models/models/DPO_price_12_decoder.dict"
-                    obj_encoder_path = "/app/train_models/models/SFT_price_new_encoder.dict"
-                    gfm2 = GFModel_obj(encoder_path, decoder2_path, obj_encoder_path)
+                    model_1 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, device=device)
+                    model_1.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.pos_model_checkpoint_name), map_location=device))
+
+                    model_2 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                    model_2.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.price_model_checkpoint_name), map_location=device))
 
                     for i in range(0, num_tests):
                         print(i)
@@ -449,10 +469,16 @@ if __name__ == "__main__":
                         r2_orig = r2[:,:8]
                         r2_new = r2[:,8]
 
-                        pred_seq1 = gfm1.run(r1_orig)
-                        pred_seq2 = gfm2.run(r2_orig, r2_new)
+                        inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
+                        ouptuts1 = model_1.gnerate(inputs1, prompts1)
+                        pred_seq1 = translate_output(outputs1)
                         sim_results1 = eval_solutions(pred_seq1)
+
+                        inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig, r2_new)
+                        ouptuts2 = model_2.gnerate(inputs2, prompts2)
+                        pred_seq2 = translate_output(outputs2)
                         sim_results2 = eval_solutions(pred_seq2)
+
                         obj_set = find_obj_pairs(sim_results1, r1, s) + find_obj_pairs(sim_results2, r2, s)
                         pareto_points = np.array(pareto_frontier(np.array(obj_set)))
 
@@ -460,11 +486,11 @@ if __name__ == "__main__":
                         pareto.append(pareto_points)
 
                 elif s == "pos_bb":
-                    decoder1_path = "/app/train_models/models/SFT_pos_decoder.dict"
-                    gfm1 = GFModel(encoder_path, decoder1_path)
-                    decoder2_path = "/app/train_models/models/DPO_bb_11_decoder.dict"
-                    obj_encoder_path = "/app/train_models/models/SFT_bb_new_encoder.dict"
-                    gfm2 = GFModel_obj(encoder_path, decoder2_path, obj_encoder_path)
+                    model_1 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, device=device)
+                    model_1.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.pos_model_checkpoint_name), map_location=device))
+
+                    model_2 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                    model_2.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.bb_model_checkpoint_name), map_location=device))
 
                     for i in range(0, num_tests):
                         print(i)
@@ -475,10 +501,16 @@ if __name__ == "__main__":
                         r2_orig = r2[:,:8]
                         r2_new = r2[:,9]
 
-                        pred_seq1 = gfm1.run(r1_orig)
-                        pred_seq2 = gfm2.run(r2_orig, r2_new)
+                        inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
+                        ouptuts1 = model_1.gnerate(inputs1, prompts1)
+                        pred_seq1 = translate_output(outputs1)
                         sim_results1 = eval_solutions(pred_seq1)
+
+                        inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig, r2_new)
+                        ouptuts2 = model_2.gnerate(inputs2, prompts2)
+                        pred_seq2 = translate_output(outputs2)
                         sim_results2 = eval_solutions(pred_seq2)
+
                         obj_set = find_obj_pairs(sim_results1, r1, s) + find_obj_pairs(sim_results2, r2, s)
                         pareto_points = np.array(pareto_frontier(np.array(obj_set)))
 
@@ -486,12 +518,11 @@ if __name__ == "__main__":
                         pareto.append(pareto_points)
 
                 elif s == "price_bb":
-                    decoder1_path = "/app/train_models/models/DPO_price_12_decoder.dict"
-                    obj_encoder_path1 = "/app/train_models/models/SFT_price_new_encoder.dict"
-                    gfm1 = GFModel_obj(encoder_path, decoder1_path, obj_encoder_path1)
-                    decoder2_path = "/app/train_models/models/DPO_bb_11_decoder.dict"
-                    obj_encoder_path2 = "/app/train_models/models/SFT_bb_new_encoder.dict"
-                    gfm2 = GFModel_obj(encoder_path, decoder2_path, obj_encoder_path2)
+                    model_1 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                    model_1.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.price_model_checkpoint_name), map_location=device))
+
+                    model_2 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                    model_2.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.bb_model_checkpoint_name), map_location=device))
 
                     for i in range(0, num_tests):
                         print(i)
@@ -503,10 +534,16 @@ if __name__ == "__main__":
                         r2_orig = r2[:,:8]
                         r2_new = r2[:,9]
 
-                        pred_seq1 = gfm1.run(r1_orig, r1_new)
-                        pred_seq2 = gfm2.run(r2_orig, r2_new)
+                        inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig, r1_new)
+                        ouptuts1 = model_1.gnerate(inputs1, prompts1)
+                        pred_seq1 = translate_output(outputs1)
                         sim_results1 = eval_solutions(pred_seq1)
+
+                        inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig, r2_new)
+                        ouptuts2 = model_2.gnerate(inputs2, prompts2)
+                        pred_seq2 = translate_output(outputs2)
                         sim_results2 = eval_solutions(pred_seq2)
+
                         obj_set = find_obj_pairs(sim_results1, r1, s) + find_obj_pairs(sim_results2, r2, s)
                         pareto_points = np.array(pareto_frontier(np.array(obj_set)))
 
@@ -514,13 +551,14 @@ if __name__ == "__main__":
                         pareto.append(pareto_points)
 
                 elif s == "speed_pos_bb": 
-                    decoder1_path = "/app/train_models/models/SFT_speed_decoder.dict"
-                    gfm1 = GFModel(encoder_path, decoder1_path)
-                    decoder2_path = "/app/train_models/models/SFT_pos_decoder.dict"
-                    gfm2 = GFModel(encoder_path, decoder2_path)
-                    obj_encoder3_path = "/app/train_models/models/SFT_bb_new_encoder.dict"
-                    decoder3_path = "/app/train_models/models/DPO_bb_11_decoder.dict"
-                    gfm3 = GFModel_obj(encoder_path, decoder3_path, obj_encoder3_path)
+                    model_1 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, device=device)
+                    model_1.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.speed_model_checkpoint_name), map_location=device))
+
+                    model_2 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, device=device)
+                    model_2.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.pos_model_checkpoint_name), map_location=device))
+
+                    model_3 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                    model_3.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.bb_model_checkpoint_name), map_location=device))
 
                     for i in range(0, num_tests):
                         print(i)
@@ -533,12 +571,21 @@ if __name__ == "__main__":
                         r3_orig = r3[:,:8]
                         r3_new = r3[:,9]
 
-                        pred_seq1 = gfm1.run(r1_orig)
-                        pred_seq2 = gfm2.run(r2_orig)
-                        pred_seq3 = gfm3.run(r3_orig, r3_new)
+                        inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
+                        ouptuts1 = model_1.gnerate(inputs1, prompts1)
+                        pred_seq1 = translate_output(outputs1)
                         sim_results1 = eval_solutions(pred_seq1)
+
+                        inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig)
+                        ouptuts2 = model_2.gnerate(inputs2, prompts2)
+                        pred_seq2 = translate_output(outputs2)
                         sim_results2 = eval_solutions(pred_seq2)
+
+                        inputs3, prompts3 = prepare_inputs_and_prompts(r3_orig, r3_new)
+                        ouptuts3 = model_3.gnerate(inputs3, prompts3)
+                        pred_seq3 = translate_output(outputs3)
                         sim_results3 = eval_solutions(pred_seq3)
+
                         obj_set = find_obj_triples(sim_results1, r1, s) + find_obj_triples(sim_results2, r2, s)
                         obj_set += find_obj_triples(sim_results3, r3, s)
                         pareto_points = np.array(pareto_frontier(np.array(obj_set)))
@@ -547,13 +594,14 @@ if __name__ == "__main__":
                         pareto.append(pareto_points)
 
                 elif s == "speed_pos_price":
-                    decoder1_path = "/app/train_models/models/SFT_speed_decoder.dict"
-                    gfm1 = GFModel(encoder_path, decoder1_path)
-                    decoder2_path = "/app/train_models/models/SFT_pos_decoder.dict"
-                    gfm2 = GFModel(encoder_path, decoder2_path)
-                    obj_encoder3_path = "/app/train_models/models/SFT_price_new_encoder.dict"
-                    decoder3_path = "/app/train_models/models/DPO_price_12_decoder.dict"
-                    gfm3 = GFModel_obj(encoder_path, decoder3_path, obj_encoder3_path)
+                    model_1 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, device=device)
+                    model_1.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.speed_model_checkpoint_name), map_location=device))
+
+                    model_2 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, device=device)
+                    model_2.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.pos_model_checkpoint_name), map_location=device))
+
+                    model_3 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                    model_3.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.price_model_checkpoint_name), map_location=device))
 
                     for i in range(0, num_tests):
                         print(i)
@@ -566,12 +614,21 @@ if __name__ == "__main__":
                         r3_orig = r3[:,:8]
                         r3_new = r3[:,8]
 
-                        pred_seq1 = gfm1.run(r1_orig)
-                        pred_seq2 = gfm2.run(r2_orig)
-                        pred_seq3 = gfm3.run(r3_orig, r3_new)
+                        inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
+                        ouptuts1 = model_1.gnerate(inputs1, prompts1)
+                        pred_seq1 = translate_output(outputs1)
                         sim_results1 = eval_solutions(pred_seq1)
+
+                        inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig)
+                        ouptuts2 = model_2.gnerate(inputs2, prompts2)
+                        pred_seq2 = translate_output(outputs2)
                         sim_results2 = eval_solutions(pred_seq2)
+
+                        inputs3, prompts3 = prepare_inputs_and_prompts(r3_orig, r3_new)
+                        ouptuts3 = model_3.gnerate(inputs3, prompts3)
+                        pred_seq3 = translate_output(outputs3)
                         sim_results3 = eval_solutions(pred_seq3)
+
                         obj_set = find_obj_triples(sim_results1, r1, s) + find_obj_triples(sim_results2, r2, s)
                         obj_set += find_obj_triples(sim_results3, r3, s)
                         pareto_points = np.array(pareto_frontier(np.array(obj_set)))
@@ -580,14 +637,14 @@ if __name__ == "__main__":
                         pareto.append(pareto_points)
 
                 elif s == "speed_bb_price":
-                    decoder1_path = "/app/train_models/models/SFT_speed_decoder.dict"
-                    gfm1 = GFModel(encoder_path, decoder1_path)
-                    obj_encoder2_path = "/app/train_models/models/SFT_bb_new_encoder.dict"
-                    decoder2_path = "/app/train_models/models/DPO_bb_11_decoder.dict"
-                    gfm2 = GFModel_obj(encoder_path, decoder2_path, obj_encoder2_path)
-                    obj_encoder3_path = "/app/train_models/models/SFT_price_new_encoder.dict"
-                    decoder3_path = "/app/train_models/models/DPO_price_12_decoder.dict"
-                    gfm3 = GFModel_obj(encoder_path, decoder3_path, obj_encoder3_path)
+                    model_1 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, device=device)
+                    model_1.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.speed_model_checkpoint_name), map_location=device))
+
+                    model_2 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                    model_2.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.bb_model_checkpoint_name), map_location=device))
+
+                    model_3 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                    model_3.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.price_model_checkpoint_name), map_location=device))
 
                     for i in range(0, num_tests):
                         print(i)
@@ -601,12 +658,21 @@ if __name__ == "__main__":
                         r3_orig = r3[:,:8]
                         r3_new = r3[:,8]
 
-                        pred_seq1 = gfm1.run(r1_orig)
-                        pred_seq2 = gfm2.run(r2_orig, r2_new)
-                        pred_seq3 = gfm3.run(r3_orig, r3_new)
+                        inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
+                        ouptuts1 = model_1.gnerate(inputs1, prompts1)
+                        pred_seq1 = translate_output(outputs1)
                         sim_results1 = eval_solutions(pred_seq1)
+
+                        inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig, r2_new)
+                        ouptuts2 = model_2.gnerate(inputs2, prompts2)
+                        pred_seq2 = translate_output(outputs2)
                         sim_results2 = eval_solutions(pred_seq2)
+
+                        inputs3, prompts3 = prepare_inputs_and_prompts(r3_orig, r3_new)
+                        ouptuts3 = model_3.gnerate(inputs3, prompts3)
+                        pred_seq3 = translate_output(outputs3)
                         sim_results3 = eval_solutions(pred_seq3)
+
                         obj_set = find_obj_triples(sim_results1, r1, s) + find_obj_triples(sim_results2, r2, s)
                         obj_set += find_obj_triples(sim_results3, r3, s)
                         pareto_points = np.array(pareto_frontier(np.array(obj_set)))
@@ -615,14 +681,14 @@ if __name__ == "__main__":
                         pareto.append(pareto_points)
 
                 elif s == "pos_price_bb":
-                    decoder1_path = "/app/train_models/models/SFT_pos_decoder.dict"
-                    gfm1 = GFModel(encoder_path, decoder1_path)
-                    obj_encoder2_path = "/app/train_models/models/SFT_price_new_encoder.dict"
-                    decoder2_path = "/app/train_models/models/DPO_price_12_decoder.dict"
-                    gfm2 = GFModel_obj(encoder_path, decoder2_path, obj_encoder2_path)
-                    obj_encoder3_path = "/app/train_models/models/SFT_bb_new_encoder.dict"
-                    decoder3_path = "/app/train_models/models/DPO_bb_11_decoder.dict"
-                    gfm3 = GFModel_obj(encoder_path, decoder3_path, obj_encoder3_path)
+                    model_1 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, device=device)
+                    model_1.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.pos_model_checkpoint_name), map_location=device))
+
+                    model_2 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                    model_2.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.price_model_checkpoint_name), map_location=device))
+
+                    model_3 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                    model_3.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.bb_model_checkpoint_name), map_location=device))
 
                     for i in range(0, num_tests):
                         print(i)
@@ -636,12 +702,21 @@ if __name__ == "__main__":
                         r3_orig = r3[:,:8]
                         r3_new = r3[:,9]
 
-                        pred_seq1 = gfm1.run(r1_orig)
-                        pred_seq2 = gfm2.run(r2_orig, r2_new)
-                        pred_seq3 = gfm3.run(r3_orig, r3_new)
+                        inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
+                        ouptuts1 = model_1.gnerate(inputs1, prompts1)
+                        pred_seq1 = translate_output(outputs1)
                         sim_results1 = eval_solutions(pred_seq1)
+
+                        inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig, r2_new)
+                        ouptuts2 = model_2.gnerate(inputs2, prompts2)
+                        pred_seq2 = translate_output(outputs2)
                         sim_results2 = eval_solutions(pred_seq2)
+
+                        inputs3, prompts3 = prepare_inputs_and_prompts(r3_orig, r3_new)
+                        ouptuts3 = model_3.gnerate(inputs3, prompts3)
+                        pred_seq3 = translate_output(outputs3)
                         sim_results3 = eval_solutions(pred_seq3)
+
                         obj_set = find_obj_triples(sim_results1, r1, s) + find_obj_triples(sim_results2, r2, s)
                         obj_set += find_obj_triples(sim_results3, r3, s)
                         pareto_points = np.array(pareto_frontier(np.array(obj_set)))
@@ -666,13 +741,12 @@ if __name__ == "__main__":
                 num_pareto = []
                 pareto = []
 
-                encoder_path = "/app/train_models/models/GearFormer_0.0001_18_encoder.dict"
-
                 if s == "speed_pos": 
-                    decoder1_path = "/app/train_models/models/SFT_speed_decoder.dict"
-                    gfm1 = GFModel(encoder_path, decoder1_path)
-                    decoder2_path = "/app/train_models/models/SFT_pos_decoder.dict"
-                    gfm2 = GFModel(encoder_path, decoder2_path)
+                    model_1 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, device=device)
+                    model_1.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.speed_model_checkpoint_name), map_location=device))
+
+                    model_2 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, device=device)
+                    model_2.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.pos_model_checkpoint_name), map_location=device))
 
                     reqs1 = req_inputs["speed_pos"]["speed_eps"][:num_tests]
                     reqs2 = req_inputs["speed_pos"]["pos_eps"][:num_tests]
@@ -685,10 +759,16 @@ if __name__ == "__main__":
                         r2 = np.array(reqs2[i])
                         r2_orig = r2[:,:8]
 
-                        pred_seq1 = gfm1.run(r1_orig)
-                        pred_seq2 = gfm2.run(r2_orig)
+                        inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
+                        ouptuts1 = model_1.gnerate(inputs1, prompts1)
+                        pred_seq1 = translate_output(outputs1)
                         sim_results1 = eval_solutions(pred_seq1)
+
+                        inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig)
+                        ouptuts2 = model_2.gnerate(inputs2, prompts2)
+                        pred_seq2 = translate_output(outputs2)
                         sim_results2 = eval_solutions(pred_seq2)
+
                         obj_set = find_obj_pairs(sim_results1, r1, s) + find_obj_pairs(sim_results2, r2, s)
                         pareto_points = np.array(pareto_frontier(np.array(obj_set)))
 
@@ -696,11 +776,12 @@ if __name__ == "__main__":
                         pareto.append(pareto_points)
 
                 elif s == "speed_price":
-                    decoder1_path = "/app/train_models/models/SFT_speed_decoder.dict"
-                    gfm1 = GFModel(encoder_path, decoder1_path)
-                    decoder2_path = "/app/train_models/models/DPO_price_12_decoder.dict"
-                    obj_encoder_path = "/app/train_models/models/SFT_price_new_encoder.dict"
-                    gfm2 = GFModel_obj(encoder_path, decoder2_path, obj_encoder_path)
+
+                    model_1 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, device=device)
+                    model_1.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.speed_model_checkpoint_name), map_location=device))
+
+                    model_2 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                    model_2.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.price_model_checkpoint_name), map_location=device))
 
                     reqs1 = req_inputs["speed_price"]["speed_eps"][:num_tests]
                     reqs2 = req_inputs["speed_price"]["price_eps"][:num_tests]
@@ -714,10 +795,16 @@ if __name__ == "__main__":
                         r2_orig = r2[:,:8]
                         r2_new = r2[:,8]
 
-                        pred_seq1 = gfm1.run(r1_orig)
-                        pred_seq2 = gfm2.run(r2_orig, r2_new)
+                        inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
+                        ouptuts1 = model_1.gnerate(inputs1, prompts1)
+                        pred_seq1 = translate_output(outputs1)
                         sim_results1 = eval_solutions(pred_seq1)
+
+                        inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig, r2_new)
+                        ouptuts2 = model_2.gnerate(inputs2, prompts2)
+                        pred_seq2 = translate_output(outputs2)
                         sim_results2 = eval_solutions(pred_seq2)
+
                         obj_set = find_obj_pairs(sim_results1, r1, s) + find_obj_pairs(sim_results2, r2, s)
                         pareto_points = np.array(pareto_frontier(np.array(obj_set)))
 
@@ -725,11 +812,11 @@ if __name__ == "__main__":
                         pareto.append(pareto_points)
 
                 elif s == "speed_bb":
-                    decoder1_path = "/app/train_models/models/SFT_speed_decoder.dict"
-                    gfm1 = GFModel(encoder_path, decoder1_path)
-                    decoder2_path = "/app/train_models/models/DPO_bb_11_decoder.dict"
-                    obj_encoder_path = "/app/train_models/models/SFT_bb_new_encoder.dict"
-                    gfm2 = GFModel_obj(encoder_path, decoder2_path, obj_encoder_path)
+                    model_1 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, device=device)
+                    model_1.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.speed_model_checkpoint_name), map_location=device))
+
+                    model_2 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                    model_2.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.bb_model_checkpoint_name), map_location=device))
 
                     reqs1 = req_inputs["speed_bb"]["speed_eps"][:num_tests]
                     reqs2 = req_inputs["speed_bb"]["bb_eps"][:num_tests]
@@ -743,10 +830,16 @@ if __name__ == "__main__":
                         r2_orig = r2[:,:8]
                         r2_new = r2[:,9]
 
-                        pred_seq1 = gfm1.run(r1_orig)
-                        pred_seq2 = gfm2.run(r2_orig, r2_new)
+                        inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
+                        ouptuts1 = model_1.gnerate(inputs1, prompts1)
+                        pred_seq1 = translate_output(outputs1)
                         sim_results1 = eval_solutions(pred_seq1)
+
+                        inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig, r2_new)
+                        ouptuts2 = model_2.gnerate(inputs2, prompts2)
+                        pred_seq2 = translate_output(outputs2)
                         sim_results2 = eval_solutions(pred_seq2)
+
                         obj_set = find_obj_pairs(sim_results1, r1, s) + find_obj_pairs(sim_results2, r2, s)
                         pareto_points = np.array(pareto_frontier(np.array(obj_set)))
 
@@ -754,11 +847,11 @@ if __name__ == "__main__":
                         pareto.append(pareto_points)
 
                 elif s == "pos_price":
-                    decoder1_path = "/app/train_models/models/SFT_pos_decoder.dict"
-                    gfm1 = GFModel(encoder_path, decoder1_path)
-                    decoder2_path = "/app/train_models/models/DPO_price_12_decoder.dict"
-                    obj_encoder_path = "/app/train_models/models/SFT_price_new_encoder.dict"
-                    gfm2 = GFModel_obj(encoder_path, decoder2_path, obj_encoder_path)
+                    model_1 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, device=device)
+                    model_1.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.pos_model_checkpoint_name), map_location=device))
+
+                    model_2 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                    model_2.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.price_model_checkpoint_name), map_location=device))
 
                     reqs1 = req_inputs["pos_price"]["pos_eps"][:num_tests]
                     reqs2 = req_inputs["pos_price"]["price_eps"][:num_tests]
@@ -772,10 +865,16 @@ if __name__ == "__main__":
                         r2_orig = r2[:,:8]
                         r2_new = r2[:,8]
 
-                        pred_seq1 = gfm1.run(r1_orig)
-                        pred_seq2 = gfm2.run(r2_orig, r2_new)
+                        inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
+                        ouptuts1 = model_1.gnerate(inputs1, prompts1)
+                        pred_seq1 = translate_output(outputs1)
                         sim_results1 = eval_solutions(pred_seq1)
+
+                        inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig, r2_new)
+                        ouptuts2 = model_2.gnerate(inputs2, prompts2)
+                        pred_seq2 = translate_output(outputs2)
                         sim_results2 = eval_solutions(pred_seq2)
+
                         obj_set = find_obj_pairs(sim_results1, r1, s) + find_obj_pairs(sim_results2, r2, s)
                         pareto_points = np.array(pareto_frontier(np.array(obj_set)))
 
@@ -783,11 +882,11 @@ if __name__ == "__main__":
                         pareto.append(pareto_points)
 
                 elif s == "pos_bb":
-                    decoder1_path = "/app/train_models/models/SFT_pos_decoder.dict"
-                    gfm1 = GFModel(encoder_path, decoder1_path)
-                    decoder2_path = "/app/train_models/models/DPO_bb_11_decoder.dict"
-                    obj_encoder_path = "/app/train_models/models/SFT_bb_new_encoder.dict"
-                    gfm2 = GFModel_obj(encoder_path, decoder2_path, obj_encoder_path)
+                    model_1 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, device=device)
+                    model_1.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.pos_model_checkpoint_name), map_location=device))
+
+                    model_2 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                    model_2.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.bb_model_checkpoint_name), map_location=device))
 
                     reqs1 = req_inputs["pos_bb"]["pos_eps"][:num_tests]
                     reqs2 = req_inputs["pos_bb"]["bb_eps"][:num_tests]
@@ -801,10 +900,16 @@ if __name__ == "__main__":
                         r2_orig = r2[:,:8]
                         r2_new = r2[:,9]
 
-                        pred_seq1 = gfm1.run(r1_orig)
-                        pred_seq2 = gfm2.run(r2_orig, r2_new)
+                        inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
+                        ouptuts1 = model_1.gnerate(inputs1, prompts1)
+                        pred_seq1 = translate_output(outputs1)
                         sim_results1 = eval_solutions(pred_seq1)
+
+                        inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig, r2_new)
+                        ouptuts2 = model_2.gnerate(inputs2, prompts2)
+                        pred_seq2 = translate_output(outputs2)
                         sim_results2 = eval_solutions(pred_seq2)
+
                         obj_set = find_obj_pairs(sim_results1, r1, s) + find_obj_pairs(sim_results2, r2, s)
                         pareto_points = np.array(pareto_frontier(np.array(obj_set)))
 
@@ -812,12 +917,11 @@ if __name__ == "__main__":
                         pareto.append(pareto_points)
 
                 elif s == "price_bb":
-                    decoder1_path = "/app/train_models/models/DPO_price_12_decoder.dict"
-                    obj_encoder_path1 = "/app/train_models/models/SFT_price_new_encoder.dict"
-                    gfm1 = GFModel_obj(encoder_path, decoder1_path, obj_encoder_path1)
-                    decoder2_path = "/app/train_models/models/DPO_bb_11_decoder.dict"
-                    obj_encoder_path2 = "/app/train_models/models/SFT_bb_new_encoder.dict"
-                    gfm2 = GFModel_obj(encoder_path, decoder2_path, obj_encoder_path2)
+                    model_1 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                    model_1.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.price_model_checkpoint_name), map_location=device))
+
+                    model_2 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                    model_2.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.bb_model_checkpoint_name), map_location=device))
 
                     reqs1 = req_inputs["price_bb"]["price_eps"][:num_tests]
                     reqs2 = req_inputs["price_bb"]["bb_eps"][:num_tests]
@@ -832,10 +936,16 @@ if __name__ == "__main__":
                         r2_orig = r2[:,:8]
                         r2_new = r2[:,9]
 
-                        pred_seq1 = gfm1.run(r1_orig, r1_new)
-                        pred_seq2 = gfm2.run(r2_orig, r2_new)
+                        inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig, r1_new)
+                        ouptuts1 = model_1.gnerate(inputs1, prompts1)
+                        pred_seq1 = translate_output(outputs1)
                         sim_results1 = eval_solutions(pred_seq1)
+
+                        inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig, r2_new)
+                        ouptuts2 = model_2.gnerate(inputs2, prompts2)
+                        pred_seq2 = translate_output(outputs2)
                         sim_results2 = eval_solutions(pred_seq2)
+
                         obj_set = find_obj_pairs(sim_results1, r1, s) + find_obj_pairs(sim_results2, r2, s)
                         pareto_points = np.array(pareto_frontier(np.array(obj_set)))
 
@@ -843,13 +953,14 @@ if __name__ == "__main__":
                         pareto.append(pareto_points)
 
                 elif s == "speed_pos_bb": 
-                    decoder1_path = "/app/train_models/models/SFT_speed_decoder.dict"
-                    gfm1 = GFModel(encoder_path, decoder1_path)
-                    decoder2_path = "/app/train_models/models/SFT_pos_decoder.dict"
-                    gfm2 = GFModel(encoder_path, decoder2_path)
-                    obj_encoder3_path = "/app/train_models/models/SFT_bb_new_encoder.dict"
-                    decoder3_path = "/app/train_models/models/DPO_bb_11_decoder.dict"
-                    gfm3 = GFModel_obj(encoder_path, decoder3_path, obj_encoder3_path)
+                    model_1 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, device=device)
+                    model_1.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.speed_model_checkpoint_name), map_location=device))
+
+                    model_2 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, device=device)
+                    model_2.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.pos_model_checkpoint_name), map_location=device))
+
+                    model_3 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                    model_3.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.bb_model_checkpoint_name), map_location=device))
 
                     reqs1 = req_inputs["speed_pos_bb"]["speed_eps"][:num_tests]
                     reqs2 = req_inputs["speed_pos_bb"]["pos_eps"][:num_tests]
@@ -867,12 +978,21 @@ if __name__ == "__main__":
                         r3_orig = r3[:,:8]
                         r3_new = r3[:,9]
 
-                        pred_seq1 = gfm1.run(r1_orig)
-                        pred_seq2 = gfm2.run(r2_orig)
-                        pred_seq3 = gfm3.run(r3_orig, r3_new)
+                        inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
+                        ouptuts1 = model_1.gnerate(inputs1, prompts1)
+                        pred_seq1 = translate_output(outputs1)
                         sim_results1 = eval_solutions(pred_seq1)
+
+                        inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig)
+                        ouptuts2 = model_2.gnerate(inputs2, prompts2)
+                        pred_seq2 = translate_output(outputs2)
                         sim_results2 = eval_solutions(pred_seq2)
+
+                        inputs3, prompts3 = prepare_inputs_and_prompts(r3_orig, r3_new)
+                        ouptuts3 = model_3.gnerate(inputs3, prompts3)
+                        pred_seq3 = translate_output(outputs3)
                         sim_results3 = eval_solutions(pred_seq3)
+
                         obj_set = find_obj_triples(sim_results1, r1, s) + find_obj_triples(sim_results2, r2, s)
                         obj_set += find_obj_triples(sim_results3, r3, s)
                         pareto_points = np.array(pareto_frontier(np.array(obj_set)))
@@ -881,13 +1001,14 @@ if __name__ == "__main__":
                         pareto.append(pareto_points)
 
                 elif s == "speed_pos_price":
-                    decoder1_path = "/app/train_models/models/SFT_speed_decoder.dict"
-                    gfm1 = GFModel(encoder_path, decoder1_path)
-                    decoder2_path = "/app/train_models/models/SFT_pos_decoder.dict"
-                    gfm2 = GFModel(encoder_path, decoder2_path)
-                    obj_encoder3_path = "/app/train_models/models/SFT_price_new_encoder.dict"
-                    decoder3_path = "/app/train_models/models/DPO_price_12_decoder.dict"
-                    gfm3 = GFModel_obj(encoder_path, decoder3_path, obj_encoder3_path)
+                    model_1 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, device=device)
+                    model_1.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.speed_model_checkpoint_name), map_location=device))
+
+                    model_2 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, device=device)
+                    model_2.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.pos_model_checkpoint_name), map_location=device))
+
+                    model_3 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                    model_3.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.price_model_checkpoint_name), map_location=device))
 
                     reqs1 = req_inputs["speed_pos_price"]["speed_eps"][:num_tests]
                     reqs2 = req_inputs["speed_pos_price"]["pos_eps"][:num_tests]
@@ -905,12 +1026,21 @@ if __name__ == "__main__":
                         r3_orig = r3[:,:8]
                         r3_new = r3[:,9]
 
-                        pred_seq1 = gfm1.run(r1_orig)
-                        pred_seq2 = gfm2.run(r2_orig)
-                        pred_seq3 = gfm3.run(r3_orig, r3_new)
+                        inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
+                        ouptuts1 = model_1.gnerate(inputs1, prompts1)
+                        pred_seq1 = translate_output(outputs1)
                         sim_results1 = eval_solutions(pred_seq1)
+
+                        inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig)
+                        ouptuts2 = model_2.gnerate(inputs2, prompts2)
+                        pred_seq2 = translate_output(outputs2)
                         sim_results2 = eval_solutions(pred_seq2)
+
+                        inputs3, prompts3 = prepare_inputs_and_prompts(r3_orig, r3_new)
+                        ouptuts3 = model_3.gnerate(inputs3, prompts3)
+                        pred_seq3 = translate_output(outputs3)
                         sim_results3 = eval_solutions(pred_seq3)
+
                         obj_set = find_obj_triples(sim_results1, r1, s) + find_obj_triples(sim_results2, r2, s)
                         obj_set += find_obj_triples(sim_results3, r3, s)
                         pareto_points = np.array(pareto_frontier(np.array(obj_set)))
@@ -919,14 +1049,14 @@ if __name__ == "__main__":
                         pareto.append(pareto_points)
 
                 elif s == "speed_bb_price":
-                    decoder1_path = "/app/train_models/models/SFT_speed_decoder.dict"
-                    gfm1 = GFModel(encoder_path, decoder1_path)
-                    obj_encoder2_path = "/app/train_models/models/SFT_bb_new_encoder.dict"
-                    decoder2_path = "/app/train_models/models/DPO_bb_11_decoder.dict"
-                    gfm2 = GFModel_obj(encoder_path, decoder2_path, obj_encoder2_path)
-                    obj_encoder3_path = "/app/train_models/models/SFT_price_new_encoder.dict"
-                    decoder3_path = "/app/train_models/models/DPO_price_12_decoder.dict"
-                    gfm3 = GFModel_obj(encoder_path, decoder3_path, obj_encoder3_path)
+                    model_1 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, device=device)
+                    model_1.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.speed_model_checkpoint_name), map_location=device))
+
+                    model_2 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                    model_2.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.bb_model_checkpoint_name), map_location=device))
+
+                    model_3 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                    model_3.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.price_model_checkpoint_name), map_location=device))
 
                     reqs1 = req_inputs["speed_bb_price"]["speed_eps"][:num_tests]
                     reqs2 = req_inputs["speed_bb_price"]["bb_eps"][:num_tests]
@@ -945,12 +1075,21 @@ if __name__ == "__main__":
                         r3_orig = r3[:,:8]
                         r3_new = r3[:,8]
 
-                        pred_seq1 = gfm1.run(r1_orig)
-                        pred_seq2 = gfm2.run(r2_orig, r2_new)
-                        pred_seq3 = gfm3.run(r3_orig, r3_new)
+                        inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
+                        ouptuts1 = model_1.gnerate(inputs1, prompts1)
+                        pred_seq1 = translate_output(outputs1)
                         sim_results1 = eval_solutions(pred_seq1)
+
+                        inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig, r2_new)
+                        ouptuts2 = model_2.gnerate(inputs2, prompts2)
+                        pred_seq2 = translate_output(outputs2)
                         sim_results2 = eval_solutions(pred_seq2)
+
+                        inputs3, prompts3 = prepare_inputs_and_prompts(r3_orig, r3_new)
+                        ouptuts3 = model_3.gnerate(inputs3, prompts3)
+                        pred_seq3 = translate_output(outputs3)
                         sim_results3 = eval_solutions(pred_seq3)
+
                         obj_set = find_obj_triples(sim_results1, r1, s) + find_obj_triples(sim_results2, r2, s)
                         obj_set += find_obj_triples(sim_results3, r3, s)
                         pareto_points = np.array(pareto_frontier(np.array(obj_set)))
@@ -959,14 +1098,14 @@ if __name__ == "__main__":
                         pareto.append(pareto_points)
 
                 elif s == "pos_price_bb":
-                    decoder1_path = "/app/train_models/models/SFT_pos_decoder.dict"
-                    gfm1 = GFModel(encoder_path, decoder1_path)
-                    obj_encoder2_path = "/app/train_models/models/SFT_price_new_encoder.dict"
-                    decoder2_path = "/app/train_models/models/DPO_price_12_decoder.dict"
-                    gfm2 = GFModel_obj(encoder_path, decoder2_path, obj_encoder2_path)
-                    obj_encoder3_path = "/app/train_models/models/SFT_bb_new_encoder.dict"
-                    decoder3_path = "/app/train_models/models/DPO_bb_11_decoder.dict"
-                    gfm3 = GFModel_obj(encoder_path, decoder3_path, obj_encoder3_path)
+                    model_1 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, device=device)
+                    model_1.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.pos_model_checkpoint_name), map_location=device))
+
+                    model_2 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                    model_2.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.price_model_checkpoint_name), map_location=device))
+
+                    model_3 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                    model_3.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.bb_model_checkpoint_name), map_location=device))
 
                     reqs1 = req_inputs["pos_price_bb"]["pos_eps"][:num_tests]
                     reqs2 = req_inputs["pos_price_bb"]["price_eps"][:num_tests]
@@ -985,12 +1124,21 @@ if __name__ == "__main__":
                         r3_orig = r3[:,:8]
                         r3_new = r3[:,9]
 
-                        pred_seq1 = gfm1.run(r1_orig)
-                        pred_seq2 = gfm2.run(r2_orig, r2_new)
-                        pred_seq3 = gfm3.run(r3_orig, r3_new)
+                        inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
+                        ouptuts1 = model_1.gnerate(inputs1, prompts1)
+                        pred_seq1 = translate_output(outputs1)
                         sim_results1 = eval_solutions(pred_seq1)
+
+                        inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig, r2_new)
+                        ouptuts2 = model_2.gnerate(inputs2, prompts2)
+                        pred_seq2 = translate_output(outputs2)
                         sim_results2 = eval_solutions(pred_seq2)
+
+                        inputs3, prompts3 = prepare_inputs_and_prompts(r3_orig, r3_new)
+                        ouptuts3 = model_3.gnerate(inputs3, prompts3)
+                        pred_seq3 = translate_output(outputs3)
                         sim_results3 = eval_solutions(pred_seq3)
+
                         obj_set = find_obj_triples(sim_results1, r1, s) + find_obj_triples(sim_results2, r2, s)
                         obj_set += find_obj_triples(sim_results3, r3, s)
                         pareto_points = np.array(pareto_frontier(np.array(obj_set)))
@@ -1008,20 +1156,15 @@ if __name__ == "__main__":
 
         elif m == "soup":
 
-            two_w1 = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
-            two_w2 = [1.0, 0.8, 0.6, 0.4, 0.2, 0.0]
+            two_w1 = config.two_reqs_weights_1
+            two_w2 = config.two_reqs_weights_2
             two_n = int(N/6)
 
-            three_w1 = [0.0, 0.0, 1.0, 0.5, 0.0, 0.5, 0.33]
-            three_w2 = [0.0, 1.0, 0.0, 0.5, 0.5, 0.0, 0.33]
-            three_w3 = [1.0, 0.0, 0.0, 0.0, 0.5, 0.5, 0.33]
+            three_w1 = config.three_reqs_weights_1
+            three_w2 = config.three_reqs_weights_2
+            three_w3 = config.three_reqs_weights_3
 
-            if args.N == 30:
-                three_n = [0, 4, 8, 12, 16, 20, 24, 30]
-            elif args.N == 300:
-                three_n = [0, 40, 80, 120, 160, 200, 240, 300]
-            else:
-                three_n = np.linspace(0, N, 8).tolist()
+            three_n = np.linspace(0, N, 8, dtype=int).tolist()
 
             for s in scenarios:
                 t0 = time.time()
@@ -1038,9 +1181,6 @@ if __name__ == "__main__":
                 num_pareto = []
                 pareto = []
 
-                encoder_path = "/app/train_models/models/GearFormer_0.0001_18_encoder.dict"
-                path_default = "/app/train_models/models/"
-
                 if num_scenarios == 2:
                     (s1, s2) = s.split("_")
                 else:
@@ -1053,11 +1193,17 @@ if __name__ == "__main__":
                         pred_seq = []
 
                         for j in range(len(two_w1)):
-                            decoder_path = path_default + "soup_" + s1 + "_" + str(two_w1[j]) + "_" + s2 + "_" + str(two_w2[j]) + "_decoder.dict"
-                            gfm = GFModel(encoder_path, decoder_path)
+                            soup_model_name = f"soup_{s1}_{two_w1[j]}_{s2}_{two_w2[j]}.dict"
+                            soup_model_path = os.path.join(config.checkpoint_path, "soup_models", soup_model_name)
+                            soup_model = GearFormerSimFT(config, encoder=encoder, decoder=decoder, device=device)
+                            soup_model.load_state_dict(torch.load(os.path.join(config.checkpoint_path, soup_model_path), map_location=device))
+
                             r = req[j*two_n:(j+1)*two_n]
                             r_orig = r[:,:8]
-                            pred_seq += gfm.run(r_orig)
+
+                            inputs, prompts = prepare_inputs_and_prompts(r_orig)
+                            ouptuts = soup_model.gnerate(inputs, prompts) 
+                            pred_seq += translate_output(ouptuts)
 
                         sim_results = eval_solutions(pred_seq)
                         obj_set = find_obj_pairs(sim_results, req, s)
@@ -1075,12 +1221,18 @@ if __name__ == "__main__":
                         pred_seq = []
 
                         for j in range(len(two_w1)):
-                            decoder_path = path_default + "soup_" + s1 + "_" + str(two_w1[j]) + "_" + s2 + "_" + str(two_w2[j]) + "_decoder.dict"
-                            gfm = GFModel_obj(encoder_path, decoder_path, obj_encoder_path)
+                            soup_model_name = f"soup_{s1}_{two_w1[j]}_{s2}_{two_w2[j]}.dict"
+                            soup_model_path = os.path.join(config.checkpoint_path, "soup_models", soup_model_name)
+                            soup_model = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                            soup_model.load_state_dict(torch.load(os.path.join(config.checkpoint_path, soup_model_path), map_location=device))
+
                             r = req[j*two_n:(j+1)*two_n]
                             r_orig = r[:,:8]
                             r_new = r[:,8]
-                            pred_seq += gfm.run(r_orig, r_new)
+
+                            inputs, prompts = prepare_inputs_and_prompts(r_orig)
+                            ouptuts = soup_model.gnerate(inputs, prompts) 
+                            pred_seq += translate_output(ouptuts)
 
                         sim_results = eval_solutions(pred_seq)
                         obj_set = find_obj_pairs(sim_results, req, s)

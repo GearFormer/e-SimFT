@@ -141,7 +141,7 @@ python scripts/train/train_sft.py --sft_mode ric --data_sft_train data/esimft_da
 ### 13. (for benchmarking) Create rewarded-soup models. 
 
 ```
-python scripts/eval/create_soup.py --speed_checkpoint checkpoints/sft_speed.dict --pos_checkpoint checkpoints/sft_pos.dict --price_checkpoint checkpoints/ppo_price/epoch_{i}.dict --bb_checkpoint checkpoints/ppo_bb/epoch_{j}.dict
+python scripts/eval/create_soups.py --speed_model_checkpoint_name sft_speed.dict --pos_model_checkpoint_name sft_pos.dict --price_model_checkpoint_name dpo_price/epoch_0.dict --bb_model_checkpoint_name dpo_bb/epoch_0.dict
 ```
 (specify the best dpo/ppo models found in steps 10-11)
 
