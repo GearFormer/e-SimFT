@@ -36,14 +36,23 @@ def pareto_frontier(points):
     
     return list(pareto_set)
 
-def prepare_inputs_and_prompts(orig_reqs, new_reqs=None):
+def prepare_inputs_and_prompts(orig_reqs, new_reqs_1=None, new_reqs_2=None):
 
-    if new_reqs is not None:
-        new_req_inputs = torch.tensor(new_req, dtype=torch.float32, device=device)
-        inputs = (orig_req_inputs, new_req_inputs)
+    inputs = ()
+
+    orig_req_inputs = torch.tensor(orig_reqs, dtype=torch.float32, device=device)
+
+    if new_reqs_1 is not None:
+        new_req_inputs_1 = torch.tensor(new_reqs_1, dtype=torch.float32, device=device)
     else:
-        orig_req_inputs = torch.tensor(orig_reqs, dtype=torch.float32, device=device)
-        inputs = (orig_req_inputs, )
+        new_req_inputs_1 = None
+
+    if new_reqs_2 is not None:
+        new_req_inputs_2 = torch.tensor(new_reqs_2, dtype=torch.float32, device=device)
+    else:
+        new_req_inputs_2 = None
+
+    inputs = (orig_req_inputs, new_req_inputs_1, new_req_inputs_2)
 
     start_token = 0
     prompts = torch.full(
@@ -55,9 +64,9 @@ def prepare_inputs_and_prompts(orig_reqs, new_reqs=None):
 
     return inputs, prompts
     
-def translate_output(ouptuts, data_handler):
+def translate_output(outputs, data_handler):
     solutions = []
-    for pred in ouptuts:
+    for pred in outputs:
         out_seq = ["<start>"] + list(map(data_handler.inx2name, pred.cpu().tolist())) + ['<end>']
         target_inx = out_seq.index("<end>")
         out_seq = out_seq[:target_inx+1]
@@ -374,12 +383,12 @@ if __name__ == "__main__":
                         r2_orig = r2[:,:8]
                         
                         inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
-                        ouptuts1 = model_1.gnerate(inputs1, prompts1)
+                        outputs1 = model_1.generate(inputs1, prompts1)
                         pred_seq1 = translate_output(outputs1)
                         sim_results1 = eval_solutions(pred_seq1)
 
                         inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig)
-                        ouptuts2 = model_2.gnerate(inputs2, prompts2)
+                        outputs2 = model_2.generate(inputs2, prompts2)
                         pred_seq2 = translate_output(outputs2)
                         sim_results2 = eval_solutions(pred_seq2)
                         
@@ -406,12 +415,12 @@ if __name__ == "__main__":
                         r2_new = r2[:,8]
 
                         inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
-                        ouptuts1 = model_1.gnerate(inputs1, prompts1)
+                        outputs1 = model_1.generate(inputs1, prompts1)
                         pred_seq1 = translate_output(outputs1)
                         sim_results1 = eval_solutions(pred_seq1)
 
                         inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig, r2_new)
-                        ouptuts2 = model_2.gnerate(inputs2, prompts2)
+                        outputs2 = model_2.generate(inputs2, prompts2)
                         pred_seq2 = translate_output(outputs2)
                         sim_results2 = eval_solutions(pred_seq2)
 
@@ -438,12 +447,12 @@ if __name__ == "__main__":
                         r2_new = r2[:,9]
 
                         inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
-                        ouptuts1 = model_1.gnerate(inputs1, prompts1)
+                        outputs1 = model_1.generate(inputs1, prompts1)
                         pred_seq1 = translate_output(outputs1)
                         sim_results1 = eval_solutions(pred_seq1)
 
                         inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig, r2_new)
-                        ouptuts2 = model_2.gnerate(inputs2, prompts2)
+                        outputs2 = model_2.generate(inputs2, prompts2)
                         pred_seq2 = translate_output(outputs2)
                         sim_results2 = eval_solutions(pred_seq2)
 
@@ -470,12 +479,12 @@ if __name__ == "__main__":
                         r2_new = r2[:,8]
 
                         inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
-                        ouptuts1 = model_1.gnerate(inputs1, prompts1)
+                        outputs1 = model_1.generate(inputs1, prompts1)
                         pred_seq1 = translate_output(outputs1)
                         sim_results1 = eval_solutions(pred_seq1)
 
                         inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig, r2_new)
-                        ouptuts2 = model_2.gnerate(inputs2, prompts2)
+                        outputs2 = model_2.generate(inputs2, prompts2)
                         pred_seq2 = translate_output(outputs2)
                         sim_results2 = eval_solutions(pred_seq2)
 
@@ -502,12 +511,12 @@ if __name__ == "__main__":
                         r2_new = r2[:,9]
 
                         inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
-                        ouptuts1 = model_1.gnerate(inputs1, prompts1)
+                        outputs1 = model_1.generate(inputs1, prompts1)
                         pred_seq1 = translate_output(outputs1)
                         sim_results1 = eval_solutions(pred_seq1)
 
                         inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig, r2_new)
-                        ouptuts2 = model_2.gnerate(inputs2, prompts2)
+                        outputs2 = model_2.generate(inputs2, prompts2)
                         pred_seq2 = translate_output(outputs2)
                         sim_results2 = eval_solutions(pred_seq2)
 
@@ -535,12 +544,12 @@ if __name__ == "__main__":
                         r2_new = r2[:,9]
 
                         inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig, r1_new)
-                        ouptuts1 = model_1.gnerate(inputs1, prompts1)
+                        outputs1 = model_1.generate(inputs1, prompts1)
                         pred_seq1 = translate_output(outputs1)
                         sim_results1 = eval_solutions(pred_seq1)
 
                         inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig, r2_new)
-                        ouptuts2 = model_2.gnerate(inputs2, prompts2)
+                        outputs2 = model_2.generate(inputs2, prompts2)
                         pred_seq2 = translate_output(outputs2)
                         sim_results2 = eval_solutions(pred_seq2)
 
@@ -572,17 +581,17 @@ if __name__ == "__main__":
                         r3_new = r3[:,9]
 
                         inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
-                        ouptuts1 = model_1.gnerate(inputs1, prompts1)
+                        outputs1 = model_1.generate(inputs1, prompts1)
                         pred_seq1 = translate_output(outputs1)
                         sim_results1 = eval_solutions(pred_seq1)
 
                         inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig)
-                        ouptuts2 = model_2.gnerate(inputs2, prompts2)
+                        outputs2 = model_2.generate(inputs2, prompts2)
                         pred_seq2 = translate_output(outputs2)
                         sim_results2 = eval_solutions(pred_seq2)
 
                         inputs3, prompts3 = prepare_inputs_and_prompts(r3_orig, r3_new)
-                        ouptuts3 = model_3.gnerate(inputs3, prompts3)
+                        outputs3 = model_3.generate(inputs3, prompts3)
                         pred_seq3 = translate_output(outputs3)
                         sim_results3 = eval_solutions(pred_seq3)
 
@@ -615,17 +624,17 @@ if __name__ == "__main__":
                         r3_new = r3[:,8]
 
                         inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
-                        ouptuts1 = model_1.gnerate(inputs1, prompts1)
+                        outputs1 = model_1.generate(inputs1, prompts1)
                         pred_seq1 = translate_output(outputs1)
                         sim_results1 = eval_solutions(pred_seq1)
 
                         inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig)
-                        ouptuts2 = model_2.gnerate(inputs2, prompts2)
+                        outputs2 = model_2.generate(inputs2, prompts2)
                         pred_seq2 = translate_output(outputs2)
                         sim_results2 = eval_solutions(pred_seq2)
 
                         inputs3, prompts3 = prepare_inputs_and_prompts(r3_orig, r3_new)
-                        ouptuts3 = model_3.gnerate(inputs3, prompts3)
+                        outputs3 = model_3.generate(inputs3, prompts3)
                         pred_seq3 = translate_output(outputs3)
                         sim_results3 = eval_solutions(pred_seq3)
 
@@ -659,17 +668,17 @@ if __name__ == "__main__":
                         r3_new = r3[:,8]
 
                         inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
-                        ouptuts1 = model_1.gnerate(inputs1, prompts1)
+                        outputs1 = model_1.generate(inputs1, prompts1)
                         pred_seq1 = translate_output(outputs1)
                         sim_results1 = eval_solutions(pred_seq1)
 
                         inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig, r2_new)
-                        ouptuts2 = model_2.gnerate(inputs2, prompts2)
+                        outputs2 = model_2.generate(inputs2, prompts2)
                         pred_seq2 = translate_output(outputs2)
                         sim_results2 = eval_solutions(pred_seq2)
 
                         inputs3, prompts3 = prepare_inputs_and_prompts(r3_orig, r3_new)
-                        ouptuts3 = model_3.gnerate(inputs3, prompts3)
+                        outputs3 = model_3.generate(inputs3, prompts3)
                         pred_seq3 = translate_output(outputs3)
                         sim_results3 = eval_solutions(pred_seq3)
 
@@ -703,17 +712,17 @@ if __name__ == "__main__":
                         r3_new = r3[:,9]
 
                         inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
-                        ouptuts1 = model_1.gnerate(inputs1, prompts1)
+                        outputs1 = model_1.generate(inputs1, prompts1)
                         pred_seq1 = translate_output(outputs1)
                         sim_results1 = eval_solutions(pred_seq1)
 
                         inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig, r2_new)
-                        ouptuts2 = model_2.gnerate(inputs2, prompts2)
+                        outputs2 = model_2.generate(inputs2, prompts2)
                         pred_seq2 = translate_output(outputs2)
                         sim_results2 = eval_solutions(pred_seq2)
 
                         inputs3, prompts3 = prepare_inputs_and_prompts(r3_orig, r3_new)
-                        ouptuts3 = model_3.gnerate(inputs3, prompts3)
+                        outputs3 = model_3.generate(inputs3, prompts3)
                         pred_seq3 = translate_output(outputs3)
                         sim_results3 = eval_solutions(pred_seq3)
 
@@ -760,12 +769,12 @@ if __name__ == "__main__":
                         r2_orig = r2[:,:8]
 
                         inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
-                        ouptuts1 = model_1.gnerate(inputs1, prompts1)
+                        outputs1 = model_1.generate(inputs1, prompts1)
                         pred_seq1 = translate_output(outputs1)
                         sim_results1 = eval_solutions(pred_seq1)
 
                         inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig)
-                        ouptuts2 = model_2.gnerate(inputs2, prompts2)
+                        outputs2 = model_2.generate(inputs2, prompts2)
                         pred_seq2 = translate_output(outputs2)
                         sim_results2 = eval_solutions(pred_seq2)
 
@@ -796,12 +805,12 @@ if __name__ == "__main__":
                         r2_new = r2[:,8]
 
                         inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
-                        ouptuts1 = model_1.gnerate(inputs1, prompts1)
+                        outputs1 = model_1.generate(inputs1, prompts1)
                         pred_seq1 = translate_output(outputs1)
                         sim_results1 = eval_solutions(pred_seq1)
 
                         inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig, r2_new)
-                        ouptuts2 = model_2.gnerate(inputs2, prompts2)
+                        outputs2 = model_2.generate(inputs2, prompts2)
                         pred_seq2 = translate_output(outputs2)
                         sim_results2 = eval_solutions(pred_seq2)
 
@@ -831,12 +840,12 @@ if __name__ == "__main__":
                         r2_new = r2[:,9]
 
                         inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
-                        ouptuts1 = model_1.gnerate(inputs1, prompts1)
+                        outputs1 = model_1.generate(inputs1, prompts1)
                         pred_seq1 = translate_output(outputs1)
                         sim_results1 = eval_solutions(pred_seq1)
 
                         inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig, r2_new)
-                        ouptuts2 = model_2.gnerate(inputs2, prompts2)
+                        outputs2 = model_2.generate(inputs2, prompts2)
                         pred_seq2 = translate_output(outputs2)
                         sim_results2 = eval_solutions(pred_seq2)
 
@@ -866,12 +875,12 @@ if __name__ == "__main__":
                         r2_new = r2[:,8]
 
                         inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
-                        ouptuts1 = model_1.gnerate(inputs1, prompts1)
+                        outputs1 = model_1.generate(inputs1, prompts1)
                         pred_seq1 = translate_output(outputs1)
                         sim_results1 = eval_solutions(pred_seq1)
 
                         inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig, r2_new)
-                        ouptuts2 = model_2.gnerate(inputs2, prompts2)
+                        outputs2 = model_2.generate(inputs2, prompts2)
                         pred_seq2 = translate_output(outputs2)
                         sim_results2 = eval_solutions(pred_seq2)
 
@@ -901,12 +910,12 @@ if __name__ == "__main__":
                         r2_new = r2[:,9]
 
                         inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
-                        ouptuts1 = model_1.gnerate(inputs1, prompts1)
+                        outputs1 = model_1.generate(inputs1, prompts1)
                         pred_seq1 = translate_output(outputs1)
                         sim_results1 = eval_solutions(pred_seq1)
 
                         inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig, r2_new)
-                        ouptuts2 = model_2.gnerate(inputs2, prompts2)
+                        outputs2 = model_2.generate(inputs2, prompts2)
                         pred_seq2 = translate_output(outputs2)
                         sim_results2 = eval_solutions(pred_seq2)
 
@@ -937,12 +946,12 @@ if __name__ == "__main__":
                         r2_new = r2[:,9]
 
                         inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig, r1_new)
-                        ouptuts1 = model_1.gnerate(inputs1, prompts1)
+                        outputs1 = model_1.generate(inputs1, prompts1)
                         pred_seq1 = translate_output(outputs1)
                         sim_results1 = eval_solutions(pred_seq1)
 
                         inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig, r2_new)
-                        ouptuts2 = model_2.gnerate(inputs2, prompts2)
+                        outputs2 = model_2.generate(inputs2, prompts2)
                         pred_seq2 = translate_output(outputs2)
                         sim_results2 = eval_solutions(pred_seq2)
 
@@ -979,17 +988,17 @@ if __name__ == "__main__":
                         r3_new = r3[:,9]
 
                         inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
-                        ouptuts1 = model_1.gnerate(inputs1, prompts1)
+                        outputs1 = model_1.generate(inputs1, prompts1)
                         pred_seq1 = translate_output(outputs1)
                         sim_results1 = eval_solutions(pred_seq1)
 
                         inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig)
-                        ouptuts2 = model_2.gnerate(inputs2, prompts2)
+                        outputs2 = model_2.generate(inputs2, prompts2)
                         pred_seq2 = translate_output(outputs2)
                         sim_results2 = eval_solutions(pred_seq2)
 
                         inputs3, prompts3 = prepare_inputs_and_prompts(r3_orig, r3_new)
-                        ouptuts3 = model_3.gnerate(inputs3, prompts3)
+                        outputs3 = model_3.generate(inputs3, prompts3)
                         pred_seq3 = translate_output(outputs3)
                         sim_results3 = eval_solutions(pred_seq3)
 
@@ -1027,17 +1036,17 @@ if __name__ == "__main__":
                         r3_new = r3[:,9]
 
                         inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
-                        ouptuts1 = model_1.gnerate(inputs1, prompts1)
+                        outputs1 = model_1.generate(inputs1, prompts1)
                         pred_seq1 = translate_output(outputs1)
                         sim_results1 = eval_solutions(pred_seq1)
 
                         inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig)
-                        ouptuts2 = model_2.gnerate(inputs2, prompts2)
+                        outputs2 = model_2.generate(inputs2, prompts2)
                         pred_seq2 = translate_output(outputs2)
                         sim_results2 = eval_solutions(pred_seq2)
 
                         inputs3, prompts3 = prepare_inputs_and_prompts(r3_orig, r3_new)
-                        ouptuts3 = model_3.gnerate(inputs3, prompts3)
+                        outputs3 = model_3.generate(inputs3, prompts3)
                         pred_seq3 = translate_output(outputs3)
                         sim_results3 = eval_solutions(pred_seq3)
 
@@ -1076,17 +1085,17 @@ if __name__ == "__main__":
                         r3_new = r3[:,8]
 
                         inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
-                        ouptuts1 = model_1.gnerate(inputs1, prompts1)
+                        outputs1 = model_1.generate(inputs1, prompts1)
                         pred_seq1 = translate_output(outputs1)
                         sim_results1 = eval_solutions(pred_seq1)
 
                         inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig, r2_new)
-                        ouptuts2 = model_2.gnerate(inputs2, prompts2)
+                        outputs2 = model_2.generate(inputs2, prompts2)
                         pred_seq2 = translate_output(outputs2)
                         sim_results2 = eval_solutions(pred_seq2)
 
                         inputs3, prompts3 = prepare_inputs_and_prompts(r3_orig, r3_new)
-                        ouptuts3 = model_3.gnerate(inputs3, prompts3)
+                        outputs3 = model_3.generate(inputs3, prompts3)
                         pred_seq3 = translate_output(outputs3)
                         sim_results3 = eval_solutions(pred_seq3)
 
@@ -1125,17 +1134,17 @@ if __name__ == "__main__":
                         r3_new = r3[:,9]
 
                         inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
-                        ouptuts1 = model_1.gnerate(inputs1, prompts1)
+                        outputs1 = model_1.generate(inputs1, prompts1)
                         pred_seq1 = translate_output(outputs1)
                         sim_results1 = eval_solutions(pred_seq1)
 
                         inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig, r2_new)
-                        ouptuts2 = model_2.gnerate(inputs2, prompts2)
+                        outputs2 = model_2.generate(inputs2, prompts2)
                         pred_seq2 = translate_output(outputs2)
                         sim_results2 = eval_solutions(pred_seq2)
 
                         inputs3, prompts3 = prepare_inputs_and_prompts(r3_orig, r3_new)
-                        ouptuts3 = model_3.gnerate(inputs3, prompts3)
+                        outputs3 = model_3.generate(inputs3, prompts3)
                         pred_seq3 = translate_output(outputs3)
                         sim_results3 = eval_solutions(pred_seq3)
 
@@ -1202,8 +1211,8 @@ if __name__ == "__main__":
                             r_orig = r[:,:8]
 
                             inputs, prompts = prepare_inputs_and_prompts(r_orig)
-                            ouptuts = soup_model.gnerate(inputs, prompts) 
-                            pred_seq += translate_output(ouptuts)
+                            outputs = soup_model.generate(inputs, prompts) 
+                            pred_seq += translate_output(outputs)
 
                         sim_results = eval_solutions(pred_seq)
                         obj_set = find_obj_pairs(sim_results, req, s)
@@ -1230,9 +1239,9 @@ if __name__ == "__main__":
                             r_orig = r[:,:8]
                             r_new = r[:,8]
 
-                            inputs, prompts = prepare_inputs_and_prompts(r_orig)
-                            ouptuts = soup_model.gnerate(inputs, prompts) 
-                            pred_seq += translate_output(ouptuts)
+                            inputs, prompts = prepare_inputs_and_prompts(r_orig, r_new)
+                            outputs = soup_model.generate(inputs, prompts) 
+                            pred_seq += translate_output(outputs)
 
                         sim_results = eval_solutions(pred_seq)
                         obj_set = find_obj_pairs(sim_results, req, s)
@@ -1250,12 +1259,18 @@ if __name__ == "__main__":
                         pred_seq = []
 
                         for j in range(len(two_w1)):
-                            decoder_path = path_default + "soup_" + s1 + "_" + str(two_w1[j]) + "_" + s2 + "_" + str(two_w2[j]) + "_decoder.dict"
-                            gfm = GFModel_obj(encoder_path, decoder_path, obj_encoder_path)
+                            soup_model_name = f"soup_{s1}_{two_w1[j]}_{s2}_{two_w2[j]}.dict"
+                            soup_model_path = os.path.join(config.checkpoint_path, "soup_models", soup_model_name)
+                            soup_model = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                            soup_model.load_state_dict(torch.load(os.path.join(config.checkpoint_path, soup_model_path), map_location=device))
+
                             r = req[j*two_n:(j+1)*two_n]
                             r_orig = r[:,:8]
                             r_new = r[:,9]
-                            pred_seq += gfm.run(r_orig, r_new)
+
+                            inputs, prompts = prepare_inputs_and_prompts(r_orig, r_new)
+                            outputs = soup_model.generate(inputs, prompts) 
+                            pred_seq += translate_output(outputs)
 
                         sim_results = eval_solutions(pred_seq)
                         obj_set = find_obj_pairs(sim_results, req, s)
@@ -1273,12 +1288,18 @@ if __name__ == "__main__":
                         pred_seq = []
 
                         for j in range(len(two_w1)):
-                            decoder_path = path_default + "soup_" + s1 + "_" + str(two_w1[j]) + "_" + s2 + "_" + str(two_w2[j]) + "_decoder.dict"
-                            gfm = GFModel_obj(encoder_path, decoder_path, obj_encoder_path)
+                            soup_model_name = f"soup_{s1}_{two_w1[j]}_{s2}_{two_w2[j]}.dict"
+                            soup_model_path = os.path.join(config.checkpoint_path, "soup_models", soup_model_name)
+                            soup_model = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                            soup_model.load_state_dict(torch.load(os.path.join(config.checkpoint_path, soup_model_path), map_location=device))
+
                             r = req[j*two_n:(j+1)*two_n]
                             r_orig = r[:,:8]
                             r_new = r[:,8]
-                            pred_seq += gfm.run(r_orig, r_new)
+
+                            inputs, prompts = prepare_inputs_and_prompts(r_orig, r_new)
+                            outputs = soup_model.generate(inputs, prompts) 
+                            pred_seq += translate_output(outputs)
 
                         sim_results = eval_solutions(pred_seq)
                         obj_set = find_obj_pairs(sim_results, req, s)
@@ -1296,12 +1317,18 @@ if __name__ == "__main__":
                         pred_seq = []
 
                         for j in range(len(two_w1)):
-                            decoder_path = path_default + "soup_" + s1 + "_" + str(two_w1[j]) + "_" + s2 + "_" + str(two_w2[j]) + "_decoder.dict"
-                            gfm = GFModel_obj(encoder_path, decoder_path, obj_encoder_path)
+                            soup_model_name = f"soup_{s1}_{two_w1[j]}_{s2}_{two_w2[j]}.dict"
+                            soup_model_path = os.path.join(config.checkpoint_path, "soup_models", soup_model_name)
+                            soup_model = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                            soup_model.load_state_dict(torch.load(os.path.join(config.checkpoint_path, soup_model_path), map_location=device))
+
                             r = req[j*two_n:(j+1)*two_n]
                             r_orig = r[:,:8]
                             r_new = r[:,9]
-                            pred_seq += gfm.run(r_orig, r_new)
+
+                            inputs, prompts = prepare_inputs_and_prompts(r_orig, r_new)
+                            outputs = soup_model.generate(inputs, prompts) 
+                            pred_seq += translate_output(outputs)
 
                         sim_results = eval_solutions(pred_seq)
                         obj_set = find_obj_pairs(sim_results, req, s)
@@ -1320,13 +1347,19 @@ if __name__ == "__main__":
                         pred_seq = []
 
                         for j in range(len(two_w1)):
-                            decoder_path = path_default + "soup_" + s1 + "_" + str(two_w1[j]) + "_" + s2 + "_" + str(two_w2[j]) + "_decoder.dict"
-                            gfm = GFModel_obj2(encoder_path, decoder_path, obj1_encoder_path, obj2_encoder_path)
+                            soup_model_name = f"soup_{s1}_{two_w1[j]}_{s2}_{two_w2[j]}.dict"
+                            soup_model_path = os.path.join(config.checkpoint_path, "soup_models", soup_model_name)
+                            soup_model = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                            soup_model.load_state_dict(torch.load(os.path.join(config.checkpoint_path, soup_model_path), map_location=device))
+
                             r = req[j*two_n:(j+1)*two_n]
                             r_orig = r[:,:8]
-                            r_netwo_w1 = r[:,8]
-                            r_netwo_w2 = r[:,9]
-                            pred_seq += gfm.run(r_orig, r_netwo_w1, r_netwo_w2)
+                            r_new_w1 = r[:,8]
+                            r_new_w2 = r[:,9]
+
+                            inputs, prompts = prepare_inputs_and_prompts(r_orig, r_new_w1, r_new_w2)
+                            outputs = soup_model.generate(inputs, prompts) 
+                            pred_seq += translate_output(outputs)
 
                         sim_results = eval_solutions(pred_seq)
                         obj_set = find_obj_pairs(sim_results, req, s)
@@ -1342,13 +1375,18 @@ if __name__ == "__main__":
                         pred_seq = []
 
                         for j in range(len(three_w1)):
-                            decoder_path = path_default + "soup_" + s1 + "_" + str(three_w1[j]) + "_" + s2 + "_" + str(three_w2[j]) + "_" + s3 + "_" + str(three_w3[j]) + "_decoder.dict"
-                            obj3_encoder_path = "/app/train_models/models/SFT_bb_new_encoder.dict"
-                            gfm = GFModel_obj(encoder_path, decoder_path, obj3_encoder_path)
+                            soup_model_name = f"soup_{s1}_{three_w1[j]}_{s2}_{three_w2[j]}_{s3}_{three_w3[j]}.dict"
+                            soup_model_path = os.path.join(config.checkpoint_path, "soup_models", soup_model_name)
+                            soup_model = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                            soup_model.load_state_dict(torch.load(os.path.join(config.checkpoint_path, soup_model_path), map_location=device))
+
                             r = req[three_n[j]:three_n[j+1]]
                             r_orig = r[:,:8]
                             r_new = req[:,9]
-                            pred_seq += gfm.run(r_orig, r_new)
+
+                            inputs, prompts = prepare_inputs_and_prompts(r_orig, r_new)
+                            outputs = soup_model.generate(inputs, prompts) 
+                            pred_seq += translate_output(outputs)
 
                         sim_results = eval_solutions(pred_seq)
                         obj_set = find_obj_triples(sim_results, req, s)
@@ -1364,13 +1402,18 @@ if __name__ == "__main__":
                         pred_seq = []
 
                         for j in range(len(three_w1)):
-                            decoder_path = path_default + "soup_" + s1 + "_" + str(three_w1[j]) + "_" + s2 + "_" + str(three_w2[j]) + "_" + s3 + "_" + str(three_w3[j]) + "_decoder.dict"
-                            obj3_encoder_path = "/app/train_models/models/SFT_price_new_encoder.dict"
-                            gfm = GFModel_obj(encoder_path, decoder_path, obj3_encoder_path)
+                            soup_model_name = f"soup_{s1}_{three_w1[j]}_{s2}_{three_w2[j]}_{s3}_{three_w3[j]}.dict"
+                            soup_model_path = os.path.join(config.checkpoint_path, "soup_models", soup_model_name)
+                            soup_model = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                            soup_model.load_state_dict(torch.load(os.path.join(config.checkpoint_path, soup_model_path), map_location=device))
+
                             r = req[three_n[j]:three_n[j+1]]
                             r_orig = r[:,:8]
                             r_new = req[:,8]
-                            pred_seq += gfm.run(r_orig, r_new)
+
+                            inputs, prompts = prepare_inputs_and_prompts(r_orig, r_new)
+                            outputs = soup_model.generate(inputs, prompts) 
+                            pred_seq += translate_output(outputs)
 
                         sim_results = eval_solutions(pred_seq)
                         obj_set = find_obj_triples(sim_results, req, s)
@@ -1386,15 +1429,19 @@ if __name__ == "__main__":
                         pred_seq = []
 
                         for j in range(len(three_w1)):
-                            decoder_path = path_default + "soup_" + s1 + "_" + str(three_w1[j]) + "_" + s2 + "_" + str(three_w2[j]) + "_" + s3 + "_" + str(three_w3[j]) + "_decoder.dict"
-                            obj2_encoder_path = "/app/train_models/models/SFT_bb_new_encoder.dict"
-                            obj3_encoder_path = "/app/train_models/models/SFT_price_new_encoder.dict"
-                            gfm = GFModel_obj2(encoder_path, decoder_path, obj2_encoder_path, obj3_encoder_path)
+                            soup_model_name = f"soup_{s1}_{three_w1[j]}_{s2}_{three_w2[j]}_{s3}_{three_w3[j]}.dict"
+                            soup_model_path = os.path.join(config.checkpoint_path, "soup_models", soup_model_name)
+                            soup_model = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                            soup_model.load_state_dict(torch.load(os.path.join(config.checkpoint_path, soup_model_path), map_location=device))
+
                             r = req[three_n[j]:three_n[j+1]]
                             r_orig = r[:,:8]
-                            r_netwo_w1 = req[:,9]
-                            r_netwo_w2 = req[:,8]
-                            pred_seq += gfm.run(r_orig, r_netwo_w1, r_netwo_w2)
+                            r_new_w1 = req[:,9]
+                            r_new_w2 = req[:,8]
+
+                            inputs, prompts = prepare_inputs_and_prompts(r_orig, r_new_w1, r_new_w2)
+                            outputs = soup_model.generate(inputs, prompts) 
+                            pred_seq += translate_output(outputs)
 
                         sim_results = eval_solutions(pred_seq)
                         obj_set = find_obj_triples(sim_results, req, s)
@@ -1410,15 +1457,19 @@ if __name__ == "__main__":
                         pred_seq = []
 
                         for j in range(len(three_w1)):
-                            decoder_path = path_default + "soup_" + s1 + "_" + str(three_w1[j]) + "_" + s2 + "_" + str(three_w2[j]) + "_" + s3 + "_" + str(three_w3[j]) + "_decoder.dict"
-                            obj2_encoder_path = "/app/train_models/models/SFT_price_new_encoder.dict"
-                            obj3_encoder_path = "/app/train_models/models/SFT_bb_new_encoder.dict"
-                            gfm = GFModel_obj2(encoder_path, decoder_path, obj2_encoder_path, obj3_encoder_path)
+                            soup_model_name = f"soup_{s1}_{three_w1[j]}_{s2}_{three_w2[j]}_{s3}_{three_w3[j]}.dict"
+                            soup_model_path = os.path.join(config.checkpoint_path, "soup_models", soup_model_name)
+                            soup_model = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                            soup_model.load_state_dict(torch.load(os.path.join(config.checkpoint_path, soup_model_path), map_location=device))
+
                             r = req[three_n[j]:three_n[j+1]]
                             r_orig = r[:,:8]
-                            r_netwo_w1 = req[:,8]
-                            r_netwo_w2 = req[:,9]
-                            pred_seq += gfm.run(r_orig, r_netwo_w1, r_netwo_w2)
+                            r_new_w1 = req[:,8]
+                            r_new_w2 = req[:,9]
+
+                            inputs, prompts = prepare_inputs_and_prompts(r_orig, r_new_w1, r_new_w2)
+                            outputs = soup_model.generate(inputs, prompts) 
+                            pred_seq += translate_output(outputs)
 
                         sim_results = eval_solutions(pred_seq)
                         obj_set = find_obj_triples(sim_results, req, s)

@@ -5,6 +5,7 @@ from esimft.utils.data_handle import DataHandler
 from esimft.utils.config_file import config
 from esimft.model.gearformer import GFModel, ObjEncoder
 from esimft.model.gearformer_simft import GearFormerSimFT
+from esimft.model.gearformer_soup import GearFormerSoup
 import os
 
 
@@ -24,7 +25,7 @@ if __name__ == "__main__":
     model_1 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
     model_2 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
     model_3 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
-    soup_model = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+    soup_model = GearFormerSoup(config, encoder=encoder, decoder=decoder, new_req_encoder_1=new_req_encoder, new_req_encoder_2=new_req_encoder, device=device)
 
     soup_model_path = os.path.join(config.checkpoint_path, "soup_models")
     os.makedirs(soup_model_path, exist_ok=True)
@@ -72,8 +73,16 @@ if __name__ == "__main__":
             for i in range(len(w1)):
 
                 with torch.no_grad():
-                    for param1, param2, param_combined in zip(model_1.parameters(), model_2.parameters(), soup_model.parameters()):
+                    for param1, param2, param_combined in zip(model_1.encoder.parameters(), model_2.encoder.parameters(), soup_model.encoder.parameters()):
                         param_combined.data = w1[i] * param1.data + w2[i] * param2.data
+                    for param1, param2, param_combined in zip(model_1.decoder.parameters(), model_2.decoder.parameters(), soup_model.decoder.parameters()):
+                        param_combined.data = w1[i] * param1.data + w2[i] * param2.data
+
+                    if req_list[0] in ["price", "bb"]:
+                        soup_model.new_req_encoder_1 = model_1.new_req_encoder
+
+                    if req_list[1] in ["price", "bb"]:
+                        soup_model.new_req_encoder_2 = model_2.new_req_encoder
 
                 soup_model_name = f"soup_{req_list[0]}_{w1[i]}_{req_list[1]}_{w2[i]}.dict"
                 torch.save(soup_model.state_dict(), os.path.join(soup_model_path, soup_model_name))
@@ -105,8 +114,16 @@ if __name__ == "__main__":
             for i in range(len(w1)):
 
                 with torch.no_grad():
-                    for param1, param2, param3, param_combined in zip(model_1.parameters(), model_2.parameters(), model_3.parameters(), soup_model.parameters()):
-                        param_combined.data = w1[i] * param1.data + w2[i] * param2.data + w3[i] * param3.data
+                    for param1, param2, param_combined in zip(model_1.encoder.parameters(), model_2.encoder.parameters(), soup_model.encoder.parameters()):
+                        param_combined.data = w1[i] * param1.data + w2[i] * param2.data
+                    for param1, param2, param_combined in zip(model_1.decoder.parameters(), model_2.decoder.parameters(), soup_model.decoder.parameters()):
+                        param_combined.data = w1[i] * param1.data + w2[i] * param2.data
+
+                    if req_list[1] in ["price", "bb"]:
+                        soup_model.new_req_encoder_1 = model_2.new_req_encoder
+
+                    if req_list[2] in ["price", "bb"]:
+                        soup_model.new_req_encoder_2 = model_3.new_req_encoder
 
                 soup_model_name = f"soup_{req_list[0]}_{w1[i]}_{req_list[1]}_{w2[i]}_{req_list[2]}_{w3[i]}.dict"
                 torch.save(soup_model.state_dict(), os.path.join(soup_model_path, soup_model_name))   

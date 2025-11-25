@@ -1,32 +1,14 @@
-import random
-random.seed(0)
 import numpy as np
-np.random.seed(0)
-import torch
-torch.manual_seed(0)
-import torch.nn as nn
-from train_models.utils.data_handle import load_data
 from train_models.utils.config_file import config
-from train_models.load_model import loading_model
-from train_models.utils.helper import is_grammatically_correct, is_physically_feasible
-from train_models.transformers import ObjEncoder, WeightEncoder
-from simulator.gear_train_simulator import Simulator
-from esimft.utils.processing import SuppressPrint
 torch.set_printoptions(threshold=10_000)
 import pickle
 from pymoo.indicators.hv import HV
-from concurrent.futures import ThreadPoolExecutor
 from scipy.stats import ttest_ind
 import matplotlib.pyplot as plt
 from scipy.spatial import Delaunay
 
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
 args = config()
-max_length = 21
-get_dict = load_data(args)
-input_size = 8
 
 def eval_paretos(ref_point, norm_results):
     
