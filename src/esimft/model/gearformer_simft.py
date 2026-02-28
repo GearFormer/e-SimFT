@@ -8,13 +8,14 @@ class GearFormerSimFT(nn.Module):
     def __init__(
         self, config,
         encoder, decoder, new_req_encoder=None, weight_encoder=None, 
-        freeze_encoder=True, freeze_new_req_encoder=True, freeze_weight_encoder=True, device="cuda"):
+        freeze_encoder=True, freeze_new_req_encoder=True, freeze_weight_encoder=True, ric=False, device="cuda"):
 
         super(GearFormerSimFT, self).__init__()
 
         self.freeze_encoder = freeze_encoder
         self.freeze_new_req_encoder = freeze_new_req_encoder
         self.freeze_weight_encoder = freeze_weight_encoder
+        self.ric = ric
         self.device = device
         
         self.encoder = encoder
@@ -53,7 +54,10 @@ class GearFormerSimFT(nn.Module):
         encoded_input = self.encoder(req_input)
 
         if self.new_req_encoder is not None:
-            new_req_list = inputs[1][:,0].unsqueeze(-1).to(self.device)
+            if self.ric:
+                new_req_list = inputs[1][:, :2].to(self.device)
+            else:   
+                new_req_list = inputs[1][:,0].unsqueeze(-1).to(self.device)
             encoded_new_req = self.new_req_encoder(new_req_list)
             encoded_input += encoded_new_req.unsqueeze(1)
 
@@ -74,12 +78,15 @@ class GearFormerSimFT(nn.Module):
         encoded_input = self.encoder(req_input)
 
         if self.new_req_encoder is not None:
-            new_req_list = inputs[1][:,0].unsqueeze(-1).to(self.device)
+            if self.ric:
+                new_req_list = torch.cat([inputs[1], inputs[2]], dim=1).to(self.device)
+            else:
+                new_req_list = inputs[1][:,0].unsqueeze(-1).to(self.device)
             encoded_new_req = self.new_req_encoder(new_req_list)
             encoded_input += encoded_new_req.unsqueeze(1)
 
         if self.weight_encoder is not None:
-            weights = inputs[2].to(self.device)
+            weights = inputs[3].to(self.device) if self.ric else inputs[2].to(self.device)
             encoded_weights = self.weight_encoder(weights)
             encoded_input += encoded_weights.unsqueeze(1)
 

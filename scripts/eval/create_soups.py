@@ -20,12 +20,7 @@ if __name__ == "__main__":
     gfm = GFModel(config, device)
     encoder = gfm.encoder
     decoder = gfm.decoder
-    new_req_encoder = ObjEncoder(input_size=1, output_size=config.dim).to(device)
-
-    model_1 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
-    model_2 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
-    model_3 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
-    soup_model = GearFormerSoup(config, encoder=encoder, decoder=decoder, new_req_encoder_1=new_req_encoder, new_req_encoder_2=new_req_encoder, device=device)
+    soup_model = GearFormerSoup(config, encoder=encoder, decoder=decoder, new_req_encoder_1=ObjEncoder(input_size=1, output_size=config.dim).to(device), new_req_encoder_2=ObjEncoder(input_size=1, output_size=config.dim).to(device), device=device)
 
     soup_model_path = os.path.join(config.checkpoint_path, "soup_models")
     os.makedirs(soup_model_path, exist_ok=True)
@@ -43,11 +38,11 @@ if __name__ == "__main__":
             model_1.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.pos_model_checkpoint_name), map_location=device))
 
         elif req_list[0] == "price":
-            model_1 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+            model_1 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=ObjEncoder(input_size=1, output_size=config.dim).to(device), device=device)
             model_1.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.price_model_checkpoint_name), map_location=device))
 
         elif req_list[0] == "bb":
-            model_1 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+            model_1 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=ObjEncoder(input_size=1, output_size=config.dim).to(device), device=device)
             model_1.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.bb_model_checkpoint_name), map_location=device))
 
         if req_list[1] == "speed":
@@ -59,11 +54,11 @@ if __name__ == "__main__":
             model_2.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.pos_model_checkpoint_name), map_location=device))
 
         elif req_list[1] == "price":
-            model_2 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+            model_2 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=ObjEncoder(input_size=1, output_size=config.dim).to(device), device=device)
             model_2.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.price_model_checkpoint_name), map_location=device))
 
         elif req_list[1] == "bb":
-            model_2 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+            model_2 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=ObjEncoder(input_size=1, output_size=config.dim).to(device), device=device)
             model_2.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.bb_model_checkpoint_name), map_location=device))
 
         if num_test_reqs == 2:
@@ -78,11 +73,15 @@ if __name__ == "__main__":
                     for param1, param2, param_combined in zip(model_1.decoder.parameters(), model_2.decoder.parameters(), soup_model.decoder.parameters()):
                         param_combined.data = w1[i] * param1.data + w2[i] * param2.data
 
+                    new_req_encoders = []
                     if req_list[0] in ["price", "bb"]:
-                        soup_model.new_req_encoder_1 = model_1.new_req_encoder
-
+                        new_req_encoders.append(model_1.new_req_encoder)
                     if req_list[1] in ["price", "bb"]:
-                        soup_model.new_req_encoder_2 = model_2.new_req_encoder
+                        new_req_encoders.append(model_2.new_req_encoder)
+                    if len(new_req_encoders) > 0:
+                        soup_model.new_req_encoder_1 = new_req_encoders[0]
+                    if len(new_req_encoders) > 1:
+                        soup_model.new_req_encoder_2 = new_req_encoders[1]
 
                 soup_model_name = f"soup_{req_list[0]}_{w1[i]}_{req_list[1]}_{w2[i]}.dict"
                 torch.save(soup_model.state_dict(), os.path.join(soup_model_path, soup_model_name))
@@ -100,11 +99,11 @@ if __name__ == "__main__":
                 model_3.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.pos_model_checkpoint_name), map_location=device))
 
             elif req_list[2] == "price":
-                model_3 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                model_3 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=ObjEncoder(input_size=1, output_size=config.dim).to(device), device=device)
                 model_3.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.price_model_checkpoint_name), map_location=device))
 
             elif req_list[2] == "bb":
-                model_3 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                model_3 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=ObjEncoder(input_size=1, output_size=config.dim).to(device), device=device)
                 model_3.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.bb_model_checkpoint_name), map_location=device))
                 
             w1 = config.three_reqs_weights_1
@@ -119,11 +118,15 @@ if __name__ == "__main__":
                     for param1, param2, param_combined in zip(model_1.decoder.parameters(), model_2.decoder.parameters(), soup_model.decoder.parameters()):
                         param_combined.data = w1[i] * param1.data + w2[i] * param2.data
 
+                    new_req_encoders = []
                     if req_list[1] in ["price", "bb"]:
-                        soup_model.new_req_encoder_1 = model_2.new_req_encoder
-
+                        new_req_encoders.append(model_2.new_req_encoder)
                     if req_list[2] in ["price", "bb"]:
-                        soup_model.new_req_encoder_2 = model_3.new_req_encoder
+                        new_req_encoders.append(model_3.new_req_encoder)
+                    if len(new_req_encoders) > 0:
+                        soup_model.new_req_encoder_1 = new_req_encoders[0]
+                    if len(new_req_encoders) > 1:
+                        soup_model.new_req_encoder_2 = new_req_encoders[1]
 
                 soup_model_name = f"soup_{req_list[0]}_{w1[i]}_{req_list[1]}_{w2[i]}_{req_list[2]}_{w3[i]}.dict"
                 torch.save(soup_model.state_dict(), os.path.join(soup_model_path, soup_model_name))   

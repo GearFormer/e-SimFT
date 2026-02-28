@@ -44,11 +44,11 @@ if __name__ == "__main__":
         train_loader = data_handler.get_sft_ric_data(config.BS, if_val=False)
         val_loader = data_handler.get_sft_ric_data(config.BS, if_val=True)        
 
-        new_req_encoder = ObjEncoder(input_size=1, output_size=config.dim).to(device)
+        new_req_encoder = ObjEncoder(input_size=2, output_size=config.dim).to(device)
         weight_encoder = WeightEncoder(input_size=4, output_size=config.dim).to(device)
 
         gfm_ft = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, weight_encoder=weight_encoder,
-            freeze_new_req_encoder=False, freeze_weight_encoder=False, device=device)
+            freeze_new_req_encoder=False, freeze_weight_encoder=False, ric=True, device=device)
 
     sft = SFT(gfm_ft)
 

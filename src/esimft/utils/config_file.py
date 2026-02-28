@@ -103,5 +103,21 @@ def config():
     parser.add_argument('--ref_pareto_bb', type=float, default=0.262308)
     parser.add_argument('--test_methods', type=str, nargs="+", default=["base", "sim", "eps", "eps_sim", "soup", "ric"])
 
+    # ric weights per scenario (flattened; each row is a 4-dim weight vector [speed, pos, price, bb])
+    parser.add_argument('--ric_speed_pos_weights', type=float, nargs="+", default=[1,0,0,0, 0,1,0,0, 1,1,0,0])
+    parser.add_argument('--ric_speed_price_weights', type=float, nargs="+", default=[1,0,0,0, 0,0,1,0, 1,0,1,0])
+    parser.add_argument('--ric_speed_bb_weights', type=float, nargs="+", default=[1,0,0,0, 0,0,0,1, 1,0,0,1])
+    parser.add_argument('--ric_pos_price_weights', type=float, nargs="+", default=[0,1,0,0, 0,0,1,0, 0,1,1,0])
+    parser.add_argument('--ric_pos_bb_weights', type=float, nargs="+", default=[0,1,0,0, 0,0,0,1, 0,1,0,1])
+    parser.add_argument('--ric_price_bb_weights', type=float, nargs="+", default=[0,0,1,0, 0,0,0,1, 0,0,1,1])
+    parser.add_argument('--ric_speed_pos_bb_weights', type=float, nargs="+", default=[1,0,0,0, 1,1,0,0, 1,0,0,1, 0,1,0,1, 0,0,0,1, 0,1,0,0, 1,1,0,1])
+    parser.add_argument('--ric_speed_pos_price_weights', type=float, nargs="+", default=[1,0,0,0, 0,1,0,0, 0,0,1,0, 1,1,0,0, 1,0,1,0, 0,1,1,0, 1,1,1,0])
+    parser.add_argument('--ric_speed_bb_price_weights', type=float, nargs="+", default=[1,0,0,0, 0,0,1,0, 0,0,0,1, 1,0,1,0, 1,0,0,1, 0,0,1,1, 1,0,1,1])
+    parser.add_argument('--ric_pos_price_bb_weights', type=float, nargs="+", default=[0,1,0,0, 0,0,1,0, 0,0,0,1, 0,1,1,0, 0,1,0,1, 0,0,1,1, 0,1,1,1])
+
+    # ric n: number of weight-vector splits (n breakpoints = n_splits + 1, scales with any N)
+    parser.add_argument('--ric_2reqs_n_splits', type=int, default=3)
+    parser.add_argument('--ric_3reqs_n_splits', type=int, default=7)
+
     args = parser.parse_args()
     return args

@@ -1,11 +1,11 @@
-import numpy as np
-from train_models.utils.config_file import config
-torch.set_printoptions(threshold=10_000)
 import pickle
+import numpy as np
+import torch
 from pymoo.indicators.hv import HV
 from scipy.stats import ttest_ind
-import matplotlib.pyplot as plt
 from scipy.spatial import Delaunay
+import matplotlib.pyplot as plt
+from esimft.utils.config_file import config
 
 
 args = config()
@@ -16,7 +16,10 @@ def eval_paretos(ref_point, norm_results):
     hv = []
 
     for i in range(num_tests):
-        hv.append(hv_indicator(norm_results[i]))
+        if len(norm_results[i]) == 0:
+            hv.append(0.0)
+        else:
+            hv.append(hv_indicator(norm_results[i]))
 
     print("Hypervolume")
     print(np.mean(hv), np.std(hv))
@@ -161,7 +164,6 @@ def eval_methods(scenario, method, results, ref_points):
     elif len(scenario.split("_")) == 3:
         ref_points = (1.0, 1.0, 1.0)
     eval_paretos(ref_points, results_normalized)
-    input()
 
 
 def plot_2d_points(lists_of_points, filename, colors=None):
@@ -248,18 +250,17 @@ def plot_3d_points(lists_of_points, filename, colors=None):
 
 if __name__ == "__main__":
 
-    num_tests = 30
+    num_tests = args.pareto_exp_num_problems
 
     ref_points = {}
-    ref_points["speed"] = 18690.32805080772
-    ref_points["pos"] = 1.3493602375473808
-    ref_points["price"] = 2374.112880506438
-    ref_points["bb"] = 0.26230808838936703
+    ref_points["speed"] = args.ref_pareto_speed
+    ref_points["pos"] = args.ref_pareto_pos
+    ref_points["price"] = args.ref_pareto_price
+    ref_points["bb"] = args.ref_pareto_bb
 
-    methods = ["base", "soup", "ric", "sim", "eps", "eps_sim",]
+    methods = args.test_methods
 
-    scenarios = ["speed_pos", "speed_price", "speed_bb", "pos_price", "pos_bb", "price_bb",
-                 "speed_pos_price", "speed_pos_bb", "speed_bb_price", "pos_price_bb"]
+    scenarios = args.test_scenarios
 
     with open(args.pareto_exp_data_path, "rb") as f:
         results = pickle.load(f)
@@ -270,6 +271,7 @@ if __name__ == "__main__":
         for m in methods:
             print("Method: ", m, "\n")
             eval_methods(s, m, results, ref_points)
+            input()
 
     # res1 = norm_results("base", "soup", scenarios, results)
     # res2 = norm_results("ric", "eps_sim", scenarios, results)

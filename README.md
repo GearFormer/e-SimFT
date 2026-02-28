@@ -148,13 +148,15 @@ python scripts/eval/create_soups.py --speed_model_checkpoint_name sft_speed.dict
 ### 14. (for benchmarking) Generate Pareto fronts
 
 ```
-python pareto_exp.py --N 30
-python pareto_exp.py --N 300
+python scripts/eval/pareto_exp.py --pareto_num_samples 30 --speed_model_checkpoint_name sft_speed.dict --pos_model_checkpoint_name sft_pos.dict --price_model_checkpoint_name dpo_price/epoch_0.dict --bb_model_checkpoint_name dpo_bb/epoch_0.dict
+
+python scripts/eval/pareto_exp.py --pareto_num_samples 300 --speed_model_checkpoint_name sft_speed.dict --pos_model_checkpoint_name sft_pos.dict --price_model_checkpoint_name dpo_price/epoch_0.dict --bb_model_checkpoint_name dpo_bb/epoch_0.dict
 ```
 
 ### 15. (for benchmarking) Evaluate Pareto fronts
 
 ```
-python pareto_eval.py --pareto_exp_data_path esimft_data/pareto_data_30.pkl
-python pareto_eval.py --pareto_exp_data_path esimft_data/pareto_data_300.pkl
+python scripts/eval/pareto_eval.py --pareto_exp_data_path data/esimft_data/pareto_samples/pareto_data_30.pkl
+
+python scripts/eval/pareto_eval.py --pareto_exp_data_path data/esimft_data/pareto_samples/pareto_data_300.pkl
 ```

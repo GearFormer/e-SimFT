@@ -1,9 +1,10 @@
 import numpy as np
 import torch
 import torch.nn as nn
-from esimft.utils.config import config
+from esimft.utils.config_file import config
 from esimft.model.gearformer import GFModel, ObjEncoder, WeightEncoder
 from esimft.model.gearformer_simft import GearFormerSimFT
+from esimft.model.gearformer_soup import GearFormerSoup
 from esimft.utils.gearformer.sim import run_simulator, calculate_volume
 from esimft.utils.processing import SuppressPrint
 from esimft.utils.data_handle import DataHandler
@@ -36,7 +37,7 @@ def pareto_frontier(points):
     
     return list(pareto_set)
 
-def prepare_inputs_and_prompts(orig_reqs, new_reqs_1=None, new_reqs_2=None):
+def prepare_inputs_and_prompts(orig_reqs, new_reqs_1=None, new_reqs_2=None, weights=None):
 
     inputs = ()
 
@@ -52,7 +53,12 @@ def prepare_inputs_and_prompts(orig_reqs, new_reqs_1=None, new_reqs_2=None):
     else:
         new_req_inputs_2 = None
 
-    inputs = (orig_req_inputs, new_req_inputs_1, new_req_inputs_2)
+    if weights is not None:
+        weights_inputs = torch.tensor(weights, dtype=torch.float32, device=device)
+    else:
+        weights_inputs = None
+
+    inputs = (orig_req_inputs, new_req_inputs_1, new_req_inputs_2, weights_inputs)
 
     start_token = 0
     prompts = torch.full(
@@ -81,7 +87,7 @@ def eval_solutions(solutions):
                 "id": i,
                 "gear_train_sequence": solutions[i]
         })
-
+        
     with ThreadPoolExecutor(max_workers=config.num_threads_sim) as executor, SuppressPrint():
         results = list(executor.map(run_simulator, repeat(config), sim_inputs))
 
@@ -141,7 +147,7 @@ def find_obj_triples(sim_results, req_input, scenario):
 
     obj_trips = []
 
-    for i in range(0, len(req_input)):
+    for i in range(0, min(len(sim_results), len(req_input))):
         if sim_results[i]["id"] == "failed":
             continue
 
@@ -199,14 +205,14 @@ if __name__ == "__main__":
 
     N = config.pareto_num_samples
 
-    with open(os.path.join("esimft_data", config.pareto_exp_data_path, f"req_inputs_{N}.pkl"), 'rb') as f:
+    with open(os.path.join("esimft_data", config.data_pareto_samples_folder, f"req_inputs_{N}.pkl"), 'rb') as f:
         req_inputs = pickle.load(f)
 
     methods = config.test_methods
     scenarios = config.test_scenarios
     num_tests = config.pareto_exp_num_problems
 
-    data_fname = os.path.join("esimft_data", config.pareto_exp_data_path, f"pareto_data_{N}.pkl")
+    data_fname = os.path.join("esimft_data", config.data_pareto_samples_folder, f"pareto_data_{N}.pkl")
     results = {}
     for s in scenarios:
         results[s] = {}
@@ -220,8 +226,6 @@ if __name__ == "__main__":
     new_req_encoder = ObjEncoder(input_size=1, output_size=config.dim).to(device)
     weight_encoder = WeightEncoder(input_size=4, output_size=config.dim).to(device)
     
-    model = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
-
     for m in methods:
         print(f"Testing method {m}")
 
@@ -242,8 +246,9 @@ if __name__ == "__main__":
                     r = np.array(reqs[i])
                     r_orig = r[:,:8]
 
-                    pred_seq = gfm.run(r_orig)
+                    pred_seq = gfm.run(r_orig)[1] # [0] gives you the int
                     sim_results = eval_solutions(pred_seq)
+
                     if num_scenarios == 2:
                         obj_set = find_obj_pairs(sim_results, r, s)
                     elif num_scenarios == 3:
@@ -252,7 +257,9 @@ if __name__ == "__main__":
 
                     num_pareto.append(len(pareto_points))
                     pareto.append(pareto_points)
+                    
 
+                
                 print(datetime.now().strftime("%H:%M:%S"))
                 print()
 
@@ -321,8 +328,8 @@ if __name__ == "__main__":
                     r2 = np.array(reqs2[i])
                     r2_orig = r2[:,:8]
 
-                    pred_seq1 = gfm.run(r1_orig)
-                    pred_seq2 = gfm.run(r2_orig)
+                    pred_seq1 = gfm.run(r1_orig)[1]
+                    pred_seq2 = gfm.run(r2_orig)[1]
                     sim_results1 = eval_solutions(pred_seq1)
                     sim_results2 = eval_solutions(pred_seq2)
                     
@@ -340,10 +347,10 @@ if __name__ == "__main__":
                         obj_set += find_obj_triples(sim_results3, r3, s)
 
                     pareto_points = np.array(pareto_frontier(np.array(obj_set)))
-
                     num_pareto.append(len(pareto_points))
                     pareto.append(pareto_points)
 
+                
                 print(datetime.now().strftime("%H:%M:%S"))
                 print()
 
@@ -384,12 +391,12 @@ if __name__ == "__main__":
                         
                         inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
                         outputs1 = model_1.generate(inputs1, prompts1)
-                        pred_seq1 = translate_output(outputs1)
+                        pred_seq1 = translate_output(outputs1, data_handler)
                         sim_results1 = eval_solutions(pred_seq1)
 
                         inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig)
                         outputs2 = model_2.generate(inputs2, prompts2)
-                        pred_seq2 = translate_output(outputs2)
+                        pred_seq2 = translate_output(outputs2, data_handler)
                         sim_results2 = eval_solutions(pred_seq2)
                         
                         obj_set = find_obj_pairs(sim_results1, r1, s) + find_obj_pairs(sim_results2, r2, s)
@@ -412,16 +419,16 @@ if __name__ == "__main__":
                         r1_orig = r1[:,:8]
                         r2 = req[int(N/2):]
                         r2_orig = r2[:,:8]
-                        r2_new = r2[:,8]
+                        r2_new = r2[:,8:9]
 
                         inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
                         outputs1 = model_1.generate(inputs1, prompts1)
-                        pred_seq1 = translate_output(outputs1)
+                        pred_seq1 = translate_output(outputs1, data_handler)
                         sim_results1 = eval_solutions(pred_seq1)
 
                         inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig, r2_new)
                         outputs2 = model_2.generate(inputs2, prompts2)
-                        pred_seq2 = translate_output(outputs2)
+                        pred_seq2 = translate_output(outputs2, data_handler)
                         sim_results2 = eval_solutions(pred_seq2)
 
                         obj_set = find_obj_pairs(sim_results1, r1, s) + find_obj_pairs(sim_results2, r2, s)
@@ -444,16 +451,16 @@ if __name__ == "__main__":
                         r1_orig = r1[:,:8]
                         r2 = req[int(N/2):]
                         r2_orig = r2[:,:8]
-                        r2_new = r2[:,9]
+                        r2_new = r2[:,9:10]
 
                         inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
                         outputs1 = model_1.generate(inputs1, prompts1)
-                        pred_seq1 = translate_output(outputs1)
+                        pred_seq1 = translate_output(outputs1, data_handler)
                         sim_results1 = eval_solutions(pred_seq1)
 
                         inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig, r2_new)
                         outputs2 = model_2.generate(inputs2, prompts2)
-                        pred_seq2 = translate_output(outputs2)
+                        pred_seq2 = translate_output(outputs2, data_handler)
                         sim_results2 = eval_solutions(pred_seq2)
 
                         obj_set = find_obj_pairs(sim_results1, r1, s) + find_obj_pairs(sim_results2, r2, s)
@@ -476,16 +483,16 @@ if __name__ == "__main__":
                         r1_orig = r1[:,:8]
                         r2 = req[int(N/2):]
                         r2_orig = r2[:,:8]
-                        r2_new = r2[:,8]
+                        r2_new = r2[:,8:9]
 
                         inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
                         outputs1 = model_1.generate(inputs1, prompts1)
-                        pred_seq1 = translate_output(outputs1)
+                        pred_seq1 = translate_output(outputs1, data_handler)
                         sim_results1 = eval_solutions(pred_seq1)
 
                         inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig, r2_new)
                         outputs2 = model_2.generate(inputs2, prompts2)
-                        pred_seq2 = translate_output(outputs2)
+                        pred_seq2 = translate_output(outputs2, data_handler)
                         sim_results2 = eval_solutions(pred_seq2)
 
                         obj_set = find_obj_pairs(sim_results1, r1, s) + find_obj_pairs(sim_results2, r2, s)
@@ -508,16 +515,16 @@ if __name__ == "__main__":
                         r1_orig = r1[:,:8]
                         r2 = req[int(N/2):]
                         r2_orig = r2[:,:8]
-                        r2_new = r2[:,9]
+                        r2_new = r2[:,9:10]
 
                         inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
                         outputs1 = model_1.generate(inputs1, prompts1)
-                        pred_seq1 = translate_output(outputs1)
+                        pred_seq1 = translate_output(outputs1, data_handler)
                         sim_results1 = eval_solutions(pred_seq1)
 
                         inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig, r2_new)
                         outputs2 = model_2.generate(inputs2, prompts2)
-                        pred_seq2 = translate_output(outputs2)
+                        pred_seq2 = translate_output(outputs2, data_handler)
                         sim_results2 = eval_solutions(pred_seq2)
 
                         obj_set = find_obj_pairs(sim_results1, r1, s) + find_obj_pairs(sim_results2, r2, s)
@@ -527,10 +534,10 @@ if __name__ == "__main__":
                         pareto.append(pareto_points)
 
                 elif s == "price_bb":
-                    model_1 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                    model_1 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=ObjEncoder(input_size=1, output_size=config.dim).to(device), device=device)
                     model_1.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.price_model_checkpoint_name), map_location=device))
 
-                    model_2 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                    model_2 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=ObjEncoder(input_size=1, output_size=config.dim).to(device), device=device)
                     model_2.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.bb_model_checkpoint_name), map_location=device))
 
                     for i in range(0, num_tests):
@@ -538,19 +545,19 @@ if __name__ == "__main__":
                         req = np.array(reqs[i])
                         r1 = req[:int(N/2)]
                         r1_orig = r1[:,:8]
-                        r1_new = r2[:,8]
+                        r1_new = r1[:,8:9]
                         r2 = req[int(N/2):]
                         r2_orig = r2[:,:8]
-                        r2_new = r2[:,9]
+                        r2_new = r2[:,9:10]
 
                         inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig, r1_new)
                         outputs1 = model_1.generate(inputs1, prompts1)
-                        pred_seq1 = translate_output(outputs1)
+                        pred_seq1 = translate_output(outputs1, data_handler)
                         sim_results1 = eval_solutions(pred_seq1)
 
                         inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig, r2_new)
                         outputs2 = model_2.generate(inputs2, prompts2)
-                        pred_seq2 = translate_output(outputs2)
+                        pred_seq2 = translate_output(outputs2, data_handler)
                         sim_results2 = eval_solutions(pred_seq2)
 
                         obj_set = find_obj_pairs(sim_results1, r1, s) + find_obj_pairs(sim_results2, r2, s)
@@ -578,21 +585,21 @@ if __name__ == "__main__":
                         r2_orig = r2[:,:8]
                         r3 = req[int(N/3):]
                         r3_orig = r3[:,:8]
-                        r3_new = r3[:,9]
+                        r3_new = r3[:,9:10]
 
                         inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
                         outputs1 = model_1.generate(inputs1, prompts1)
-                        pred_seq1 = translate_output(outputs1)
+                        pred_seq1 = translate_output(outputs1, data_handler)
                         sim_results1 = eval_solutions(pred_seq1)
 
                         inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig)
                         outputs2 = model_2.generate(inputs2, prompts2)
-                        pred_seq2 = translate_output(outputs2)
+                        pred_seq2 = translate_output(outputs2, data_handler)
                         sim_results2 = eval_solutions(pred_seq2)
 
                         inputs3, prompts3 = prepare_inputs_and_prompts(r3_orig, r3_new)
                         outputs3 = model_3.generate(inputs3, prompts3)
-                        pred_seq3 = translate_output(outputs3)
+                        pred_seq3 = translate_output(outputs3, data_handler)
                         sim_results3 = eval_solutions(pred_seq3)
 
                         obj_set = find_obj_triples(sim_results1, r1, s) + find_obj_triples(sim_results2, r2, s)
@@ -621,21 +628,21 @@ if __name__ == "__main__":
                         r2_orig = r2[:,:8]
                         r3 = req[int(N/3):]
                         r3_orig = r3[:,:8]
-                        r3_new = r3[:,8]
+                        r3_new = r3[:,8:9]
 
                         inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
                         outputs1 = model_1.generate(inputs1, prompts1)
-                        pred_seq1 = translate_output(outputs1)
+                        pred_seq1 = translate_output(outputs1, data_handler)
                         sim_results1 = eval_solutions(pred_seq1)
 
                         inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig)
                         outputs2 = model_2.generate(inputs2, prompts2)
-                        pred_seq2 = translate_output(outputs2)
+                        pred_seq2 = translate_output(outputs2, data_handler)
                         sim_results2 = eval_solutions(pred_seq2)
 
                         inputs3, prompts3 = prepare_inputs_and_prompts(r3_orig, r3_new)
                         outputs3 = model_3.generate(inputs3, prompts3)
-                        pred_seq3 = translate_output(outputs3)
+                        pred_seq3 = translate_output(outputs3, data_handler)
                         sim_results3 = eval_solutions(pred_seq3)
 
                         obj_set = find_obj_triples(sim_results1, r1, s) + find_obj_triples(sim_results2, r2, s)
@@ -649,10 +656,10 @@ if __name__ == "__main__":
                     model_1 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, device=device)
                     model_1.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.speed_model_checkpoint_name), map_location=device))
 
-                    model_2 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                    model_2 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=ObjEncoder(input_size=1, output_size=config.dim).to(device), device=device)
                     model_2.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.bb_model_checkpoint_name), map_location=device))
 
-                    model_3 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                    model_3 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=ObjEncoder(input_size=1, output_size=config.dim).to(device), device=device)
                     model_3.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.price_model_checkpoint_name), map_location=device))
 
                     for i in range(0, num_tests):
@@ -662,24 +669,24 @@ if __name__ == "__main__":
                         r1_orig = r1[:,:8]
                         r2 = req[int(N/3):]
                         r2_orig = r2[:,:8]
-                        r2_new = r2[:,9]
+                        r2_new = r2[:,9:10]
                         r3 = req[int(N/3):]
                         r3_orig = r3[:,:8]
-                        r3_new = r3[:,8]
+                        r3_new = r3[:,8:9]
 
                         inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
                         outputs1 = model_1.generate(inputs1, prompts1)
-                        pred_seq1 = translate_output(outputs1)
+                        pred_seq1 = translate_output(outputs1, data_handler)
                         sim_results1 = eval_solutions(pred_seq1)
 
                         inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig, r2_new)
                         outputs2 = model_2.generate(inputs2, prompts2)
-                        pred_seq2 = translate_output(outputs2)
+                        pred_seq2 = translate_output(outputs2, data_handler)
                         sim_results2 = eval_solutions(pred_seq2)
 
                         inputs3, prompts3 = prepare_inputs_and_prompts(r3_orig, r3_new)
                         outputs3 = model_3.generate(inputs3, prompts3)
-                        pred_seq3 = translate_output(outputs3)
+                        pred_seq3 = translate_output(outputs3, data_handler)
                         sim_results3 = eval_solutions(pred_seq3)
 
                         obj_set = find_obj_triples(sim_results1, r1, s) + find_obj_triples(sim_results2, r2, s)
@@ -693,10 +700,10 @@ if __name__ == "__main__":
                     model_1 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, device=device)
                     model_1.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.pos_model_checkpoint_name), map_location=device))
 
-                    model_2 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                    model_2 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=ObjEncoder(input_size=1, output_size=config.dim).to(device), device=device)
                     model_2.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.price_model_checkpoint_name), map_location=device))
 
-                    model_3 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                    model_3 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=ObjEncoder(input_size=1, output_size=config.dim).to(device), device=device)
                     model_3.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.bb_model_checkpoint_name), map_location=device))
 
                     for i in range(0, num_tests):
@@ -706,24 +713,24 @@ if __name__ == "__main__":
                         r1_orig = r1[:,:8]
                         r2 = req[int(N/3):]
                         r2_orig = r2[:,:8]
-                        r2_new = r2[:,8]
+                        r2_new = r2[:,8:9]
                         r3 = req[int(N/3):]
                         r3_orig = r3[:,:8]
-                        r3_new = r3[:,9]
+                        r3_new = r3[:,9:10]
 
                         inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
                         outputs1 = model_1.generate(inputs1, prompts1)
-                        pred_seq1 = translate_output(outputs1)
+                        pred_seq1 = translate_output(outputs1, data_handler)
                         sim_results1 = eval_solutions(pred_seq1)
 
                         inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig, r2_new)
                         outputs2 = model_2.generate(inputs2, prompts2)
-                        pred_seq2 = translate_output(outputs2)
+                        pred_seq2 = translate_output(outputs2, data_handler)
                         sim_results2 = eval_solutions(pred_seq2)
 
                         inputs3, prompts3 = prepare_inputs_and_prompts(r3_orig, r3_new)
                         outputs3 = model_3.generate(inputs3, prompts3)
-                        pred_seq3 = translate_output(outputs3)
+                        pred_seq3 = translate_output(outputs3, data_handler)
                         sim_results3 = eval_solutions(pred_seq3)
 
                         obj_set = find_obj_triples(sim_results1, r1, s) + find_obj_triples(sim_results2, r2, s)
@@ -732,7 +739,8 @@ if __name__ == "__main__":
 
                         num_pareto.append(len(pareto_points))
                         pareto.append(pareto_points)
-
+                
+                
                 print(datetime.now().strftime("%H:%M:%S"))
                 print()
 
@@ -770,12 +778,12 @@ if __name__ == "__main__":
 
                         inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
                         outputs1 = model_1.generate(inputs1, prompts1)
-                        pred_seq1 = translate_output(outputs1)
+                        pred_seq1 = translate_output(outputs1, data_handler)
                         sim_results1 = eval_solutions(pred_seq1)
 
                         inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig)
                         outputs2 = model_2.generate(inputs2, prompts2)
-                        pred_seq2 = translate_output(outputs2)
+                        pred_seq2 = translate_output(outputs2, data_handler)
                         sim_results2 = eval_solutions(pred_seq2)
 
                         obj_set = find_obj_pairs(sim_results1, r1, s) + find_obj_pairs(sim_results2, r2, s)
@@ -802,16 +810,16 @@ if __name__ == "__main__":
 
                         r2 = np.array(reqs2[i])
                         r2_orig = r2[:,:8]
-                        r2_new = r2[:,8]
+                        r2_new = r2[:,8:9]
 
                         inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
                         outputs1 = model_1.generate(inputs1, prompts1)
-                        pred_seq1 = translate_output(outputs1)
+                        pred_seq1 = translate_output(outputs1, data_handler)
                         sim_results1 = eval_solutions(pred_seq1)
 
                         inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig, r2_new)
                         outputs2 = model_2.generate(inputs2, prompts2)
-                        pred_seq2 = translate_output(outputs2)
+                        pred_seq2 = translate_output(outputs2, data_handler)
                         sim_results2 = eval_solutions(pred_seq2)
 
                         obj_set = find_obj_pairs(sim_results1, r1, s) + find_obj_pairs(sim_results2, r2, s)
@@ -837,16 +845,16 @@ if __name__ == "__main__":
 
                         r2 = np.array(reqs2[i])
                         r2_orig = r2[:,:8]
-                        r2_new = r2[:,9]
+                        r2_new = r2[:,9:10]
 
                         inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
                         outputs1 = model_1.generate(inputs1, prompts1)
-                        pred_seq1 = translate_output(outputs1)
+                        pred_seq1 = translate_output(outputs1, data_handler)
                         sim_results1 = eval_solutions(pred_seq1)
 
                         inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig, r2_new)
                         outputs2 = model_2.generate(inputs2, prompts2)
-                        pred_seq2 = translate_output(outputs2)
+                        pred_seq2 = translate_output(outputs2, data_handler)
                         sim_results2 = eval_solutions(pred_seq2)
 
                         obj_set = find_obj_pairs(sim_results1, r1, s) + find_obj_pairs(sim_results2, r2, s)
@@ -872,16 +880,16 @@ if __name__ == "__main__":
 
                         r2 = np.array(reqs2[i])
                         r2_orig = r2[:,:8]
-                        r2_new = r2[:,8]
+                        r2_new = r2[:,8:9]
 
                         inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
                         outputs1 = model_1.generate(inputs1, prompts1)
-                        pred_seq1 = translate_output(outputs1)
+                        pred_seq1 = translate_output(outputs1, data_handler)
                         sim_results1 = eval_solutions(pred_seq1)
 
                         inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig, r2_new)
                         outputs2 = model_2.generate(inputs2, prompts2)
-                        pred_seq2 = translate_output(outputs2)
+                        pred_seq2 = translate_output(outputs2, data_handler)
                         sim_results2 = eval_solutions(pred_seq2)
 
                         obj_set = find_obj_pairs(sim_results1, r1, s) + find_obj_pairs(sim_results2, r2, s)
@@ -907,16 +915,16 @@ if __name__ == "__main__":
 
                         r2 = np.array(reqs2[i])
                         r2_orig = r2[:,:8]
-                        r2_new = r2[:,9]
+                        r2_new = r2[:,9:10]
 
                         inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
                         outputs1 = model_1.generate(inputs1, prompts1)
-                        pred_seq1 = translate_output(outputs1)
+                        pred_seq1 = translate_output(outputs1, data_handler)
                         sim_results1 = eval_solutions(pred_seq1)
 
                         inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig, r2_new)
                         outputs2 = model_2.generate(inputs2, prompts2)
-                        pred_seq2 = translate_output(outputs2)
+                        pred_seq2 = translate_output(outputs2, data_handler)
                         sim_results2 = eval_solutions(pred_seq2)
 
                         obj_set = find_obj_pairs(sim_results1, r1, s) + find_obj_pairs(sim_results2, r2, s)
@@ -926,10 +934,10 @@ if __name__ == "__main__":
                         pareto.append(pareto_points)
 
                 elif s == "price_bb":
-                    model_1 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                    model_1 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=ObjEncoder(input_size=1, output_size=config.dim).to(device), device=device)
                     model_1.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.price_model_checkpoint_name), map_location=device))
 
-                    model_2 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                    model_2 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=ObjEncoder(input_size=1, output_size=config.dim).to(device), device=device)
                     model_2.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.bb_model_checkpoint_name), map_location=device))
 
                     reqs1 = req_inputs["price_bb"]["price_eps"][:num_tests]
@@ -939,20 +947,20 @@ if __name__ == "__main__":
                         print(i)
                         r1 = np.array(reqs1[i])
                         r1_orig = r1[:,:8]
-                        r1_new = r1[:,8]
+                        r1_new = r1[:,8:9]
 
                         r2 = np.array(reqs2[i])
                         r2_orig = r2[:,:8]
-                        r2_new = r2[:,9]
+                        r2_new = r2[:,9:10]
 
                         inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig, r1_new)
                         outputs1 = model_1.generate(inputs1, prompts1)
-                        pred_seq1 = translate_output(outputs1)
+                        pred_seq1 = translate_output(outputs1, data_handler)
                         sim_results1 = eval_solutions(pred_seq1)
 
                         inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig, r2_new)
                         outputs2 = model_2.generate(inputs2, prompts2)
-                        pred_seq2 = translate_output(outputs2)
+                        pred_seq2 = translate_output(outputs2, data_handler)
                         sim_results2 = eval_solutions(pred_seq2)
 
                         obj_set = find_obj_pairs(sim_results1, r1, s) + find_obj_pairs(sim_results2, r2, s)
@@ -985,21 +993,21 @@ if __name__ == "__main__":
 
                         r3 = np.array(reqs3[i])
                         r3_orig = r3[:,:8]
-                        r3_new = r3[:,9]
+                        r3_new = r3[:,9:10]
 
                         inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
                         outputs1 = model_1.generate(inputs1, prompts1)
-                        pred_seq1 = translate_output(outputs1)
+                        pred_seq1 = translate_output(outputs1, data_handler)
                         sim_results1 = eval_solutions(pred_seq1)
 
                         inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig)
                         outputs2 = model_2.generate(inputs2, prompts2)
-                        pred_seq2 = translate_output(outputs2)
+                        pred_seq2 = translate_output(outputs2, data_handler)
                         sim_results2 = eval_solutions(pred_seq2)
 
                         inputs3, prompts3 = prepare_inputs_and_prompts(r3_orig, r3_new)
                         outputs3 = model_3.generate(inputs3, prompts3)
-                        pred_seq3 = translate_output(outputs3)
+                        pred_seq3 = translate_output(outputs3, data_handler)
                         sim_results3 = eval_solutions(pred_seq3)
 
                         obj_set = find_obj_triples(sim_results1, r1, s) + find_obj_triples(sim_results2, r2, s)
@@ -1033,21 +1041,21 @@ if __name__ == "__main__":
 
                         r3 = np.array(reqs3[i])
                         r3_orig = r3[:,:8]
-                        r3_new = r3[:,9]
+                        r3_new = r3[:,8:9]
 
                         inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
                         outputs1 = model_1.generate(inputs1, prompts1)
-                        pred_seq1 = translate_output(outputs1)
+                        pred_seq1 = translate_output(outputs1, data_handler)
                         sim_results1 = eval_solutions(pred_seq1)
 
                         inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig)
                         outputs2 = model_2.generate(inputs2, prompts2)
-                        pred_seq2 = translate_output(outputs2)
+                        pred_seq2 = translate_output(outputs2, data_handler)
                         sim_results2 = eval_solutions(pred_seq2)
 
                         inputs3, prompts3 = prepare_inputs_and_prompts(r3_orig, r3_new)
                         outputs3 = model_3.generate(inputs3, prompts3)
-                        pred_seq3 = translate_output(outputs3)
+                        pred_seq3 = translate_output(outputs3, data_handler)
                         sim_results3 = eval_solutions(pred_seq3)
 
                         obj_set = find_obj_triples(sim_results1, r1, s) + find_obj_triples(sim_results2, r2, s)
@@ -1061,10 +1069,10 @@ if __name__ == "__main__":
                     model_1 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, device=device)
                     model_1.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.speed_model_checkpoint_name), map_location=device))
 
-                    model_2 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                    model_2 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=ObjEncoder(input_size=1, output_size=config.dim).to(device), device=device)
                     model_2.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.bb_model_checkpoint_name), map_location=device))
 
-                    model_3 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                    model_3 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=ObjEncoder(input_size=1, output_size=config.dim).to(device), device=device)
                     model_3.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.price_model_checkpoint_name), map_location=device))
 
                     reqs1 = req_inputs["speed_bb_price"]["speed_eps"][:num_tests]
@@ -1078,25 +1086,25 @@ if __name__ == "__main__":
 
                         r2 = np.array(reqs2[i])
                         r2_orig = r2[:,:8]
-                        r2_new = r2[:,9]
+                        r2_new = r2[:,9:10]
 
                         r3 = np.array(reqs3[i])
                         r3_orig = r3[:,:8]
-                        r3_new = r3[:,8]
+                        r3_new = r3[:,8:9]
 
                         inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
                         outputs1 = model_1.generate(inputs1, prompts1)
-                        pred_seq1 = translate_output(outputs1)
+                        pred_seq1 = translate_output(outputs1, data_handler)
                         sim_results1 = eval_solutions(pred_seq1)
 
                         inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig, r2_new)
                         outputs2 = model_2.generate(inputs2, prompts2)
-                        pred_seq2 = translate_output(outputs2)
+                        pred_seq2 = translate_output(outputs2, data_handler)
                         sim_results2 = eval_solutions(pred_seq2)
 
                         inputs3, prompts3 = prepare_inputs_and_prompts(r3_orig, r3_new)
                         outputs3 = model_3.generate(inputs3, prompts3)
-                        pred_seq3 = translate_output(outputs3)
+                        pred_seq3 = translate_output(outputs3, data_handler)
                         sim_results3 = eval_solutions(pred_seq3)
 
                         obj_set = find_obj_triples(sim_results1, r1, s) + find_obj_triples(sim_results2, r2, s)
@@ -1110,10 +1118,10 @@ if __name__ == "__main__":
                     model_1 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, device=device)
                     model_1.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.pos_model_checkpoint_name), map_location=device))
 
-                    model_2 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                    model_2 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=ObjEncoder(input_size=1, output_size=config.dim).to(device), device=device)
                     model_2.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.price_model_checkpoint_name), map_location=device))
 
-                    model_3 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                    model_3 = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=ObjEncoder(input_size=1, output_size=config.dim).to(device), device=device)
                     model_3.load_state_dict(torch.load(os.path.join(config.checkpoint_path, config.bb_model_checkpoint_name), map_location=device))
 
                     reqs1 = req_inputs["pos_price_bb"]["pos_eps"][:num_tests]
@@ -1127,25 +1135,25 @@ if __name__ == "__main__":
 
                         r2 = np.array(reqs2[i])
                         r2_orig = r2[:,:8]
-                        r2_new = r2[:,8]
+                        r2_new = r2[:,8:9]
 
                         r3 = np.array(reqs3[i])
                         r3_orig = r3[:,:8]
-                        r3_new = r3[:,9]
+                        r3_new = r3[:,9:10]
 
                         inputs1, prompts1 = prepare_inputs_and_prompts(r1_orig)
                         outputs1 = model_1.generate(inputs1, prompts1)
-                        pred_seq1 = translate_output(outputs1)
+                        pred_seq1 = translate_output(outputs1, data_handler)
                         sim_results1 = eval_solutions(pred_seq1)
 
                         inputs2, prompts2 = prepare_inputs_and_prompts(r2_orig, r2_new)
                         outputs2 = model_2.generate(inputs2, prompts2)
-                        pred_seq2 = translate_output(outputs2)
+                        pred_seq2 = translate_output(outputs2, data_handler)
                         sim_results2 = eval_solutions(pred_seq2)
 
                         inputs3, prompts3 = prepare_inputs_and_prompts(r3_orig, r3_new)
                         outputs3 = model_3.generate(inputs3, prompts3)
-                        pred_seq3 = translate_output(outputs3)
+                        pred_seq3 = translate_output(outputs3, data_handler)
                         sim_results3 = eval_solutions(pred_seq3)
 
                         obj_set = find_obj_triples(sim_results1, r1, s) + find_obj_triples(sim_results2, r2, s)
@@ -1155,6 +1163,7 @@ if __name__ == "__main__":
                         num_pareto.append(len(pareto_points))
                         pareto.append(pareto_points)
 
+                
                 print(datetime.now().strftime("%H:%M:%S"))
                 print()
 
@@ -1204,7 +1213,7 @@ if __name__ == "__main__":
                         for j in range(len(two_w1)):
                             soup_model_name = f"soup_{s1}_{two_w1[j]}_{s2}_{two_w2[j]}.dict"
                             soup_model_path = os.path.join(config.checkpoint_path, "soup_models", soup_model_name)
-                            soup_model = GearFormerSimFT(config, encoder=encoder, decoder=decoder, device=device)
+                            soup_model = GearFormerSoup(config, encoder=encoder, decoder=decoder, new_req_encoder_1=ObjEncoder(input_size=1, output_size=config.dim).to(device), new_req_encoder_2=ObjEncoder(input_size=1, output_size=config.dim).to(device), device=device)
                             soup_model.load_state_dict(torch.load(os.path.join(config.checkpoint_path, soup_model_path), map_location=device))
 
                             r = req[j*two_n:(j+1)*two_n]
@@ -1212,7 +1221,7 @@ if __name__ == "__main__":
 
                             inputs, prompts = prepare_inputs_and_prompts(r_orig)
                             outputs = soup_model.generate(inputs, prompts) 
-                            pred_seq += translate_output(outputs)
+                            pred_seq += translate_output(outputs, data_handler)
 
                         sim_results = eval_solutions(pred_seq)
                         obj_set = find_obj_pairs(sim_results, req, s)
@@ -1232,16 +1241,16 @@ if __name__ == "__main__":
                         for j in range(len(two_w1)):
                             soup_model_name = f"soup_{s1}_{two_w1[j]}_{s2}_{two_w2[j]}.dict"
                             soup_model_path = os.path.join(config.checkpoint_path, "soup_models", soup_model_name)
-                            soup_model = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                            soup_model = GearFormerSoup(config, encoder=encoder, decoder=decoder, new_req_encoder_1=ObjEncoder(input_size=1, output_size=config.dim).to(device), new_req_encoder_2=ObjEncoder(input_size=1, output_size=config.dim).to(device), device=device)
                             soup_model.load_state_dict(torch.load(os.path.join(config.checkpoint_path, soup_model_path), map_location=device))
 
                             r = req[j*two_n:(j+1)*two_n]
                             r_orig = r[:,:8]
-                            r_new = r[:,8]
+                            r_new = r[:,8:9]
 
                             inputs, prompts = prepare_inputs_and_prompts(r_orig, r_new)
-                            outputs = soup_model.generate(inputs, prompts) 
-                            pred_seq += translate_output(outputs)
+                            outputs = soup_model.generate(inputs, prompts)
+                            pred_seq += translate_output(outputs, data_handler)
 
                         sim_results = eval_solutions(pred_seq)
                         obj_set = find_obj_pairs(sim_results, req, s)
@@ -1261,16 +1270,16 @@ if __name__ == "__main__":
                         for j in range(len(two_w1)):
                             soup_model_name = f"soup_{s1}_{two_w1[j]}_{s2}_{two_w2[j]}.dict"
                             soup_model_path = os.path.join(config.checkpoint_path, "soup_models", soup_model_name)
-                            soup_model = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                            soup_model = GearFormerSoup(config, encoder=encoder, decoder=decoder, new_req_encoder_1=ObjEncoder(input_size=1, output_size=config.dim).to(device), new_req_encoder_2=ObjEncoder(input_size=1, output_size=config.dim).to(device), device=device)
                             soup_model.load_state_dict(torch.load(os.path.join(config.checkpoint_path, soup_model_path), map_location=device))
 
                             r = req[j*two_n:(j+1)*two_n]
                             r_orig = r[:,:8]
-                            r_new = r[:,9]
+                            r_new = r[:,9:10]
 
                             inputs, prompts = prepare_inputs_and_prompts(r_orig, r_new)
-                            outputs = soup_model.generate(inputs, prompts) 
-                            pred_seq += translate_output(outputs)
+                            outputs = soup_model.generate(inputs, prompts)
+                            pred_seq += translate_output(outputs, data_handler)
 
                         sim_results = eval_solutions(pred_seq)
                         obj_set = find_obj_pairs(sim_results, req, s)
@@ -1290,16 +1299,16 @@ if __name__ == "__main__":
                         for j in range(len(two_w1)):
                             soup_model_name = f"soup_{s1}_{two_w1[j]}_{s2}_{two_w2[j]}.dict"
                             soup_model_path = os.path.join(config.checkpoint_path, "soup_models", soup_model_name)
-                            soup_model = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                            soup_model = GearFormerSoup(config, encoder=encoder, decoder=decoder, new_req_encoder_1=ObjEncoder(input_size=1, output_size=config.dim).to(device), new_req_encoder_2=ObjEncoder(input_size=1, output_size=config.dim).to(device), device=device)
                             soup_model.load_state_dict(torch.load(os.path.join(config.checkpoint_path, soup_model_path), map_location=device))
 
                             r = req[j*two_n:(j+1)*two_n]
                             r_orig = r[:,:8]
-                            r_new = r[:,8]
+                            r_new = r[:,8:9]
 
                             inputs, prompts = prepare_inputs_and_prompts(r_orig, r_new)
-                            outputs = soup_model.generate(inputs, prompts) 
-                            pred_seq += translate_output(outputs)
+                            outputs = soup_model.generate(inputs, prompts)
+                            pred_seq += translate_output(outputs, data_handler)
 
                         sim_results = eval_solutions(pred_seq)
                         obj_set = find_obj_pairs(sim_results, req, s)
@@ -1319,16 +1328,16 @@ if __name__ == "__main__":
                         for j in range(len(two_w1)):
                             soup_model_name = f"soup_{s1}_{two_w1[j]}_{s2}_{two_w2[j]}.dict"
                             soup_model_path = os.path.join(config.checkpoint_path, "soup_models", soup_model_name)
-                            soup_model = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                            soup_model = GearFormerSoup(config, encoder=encoder, decoder=decoder, new_req_encoder_1=ObjEncoder(input_size=1, output_size=config.dim).to(device), new_req_encoder_2=ObjEncoder(input_size=1, output_size=config.dim).to(device), device=device)
                             soup_model.load_state_dict(torch.load(os.path.join(config.checkpoint_path, soup_model_path), map_location=device))
 
                             r = req[j*two_n:(j+1)*two_n]
                             r_orig = r[:,:8]
-                            r_new = r[:,9]
+                            r_new = r[:,9:10]
 
                             inputs, prompts = prepare_inputs_and_prompts(r_orig, r_new)
-                            outputs = soup_model.generate(inputs, prompts) 
-                            pred_seq += translate_output(outputs)
+                            outputs = soup_model.generate(inputs, prompts)
+                            pred_seq += translate_output(outputs, data_handler)
 
                         sim_results = eval_solutions(pred_seq)
                         obj_set = find_obj_pairs(sim_results, req, s)
@@ -1349,17 +1358,17 @@ if __name__ == "__main__":
                         for j in range(len(two_w1)):
                             soup_model_name = f"soup_{s1}_{two_w1[j]}_{s2}_{two_w2[j]}.dict"
                             soup_model_path = os.path.join(config.checkpoint_path, "soup_models", soup_model_name)
-                            soup_model = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                            soup_model = GearFormerSoup(config, encoder=encoder, decoder=decoder, new_req_encoder_1=ObjEncoder(input_size=1, output_size=config.dim).to(device), new_req_encoder_2=ObjEncoder(input_size=1, output_size=config.dim).to(device), device=device)
                             soup_model.load_state_dict(torch.load(os.path.join(config.checkpoint_path, soup_model_path), map_location=device))
 
                             r = req[j*two_n:(j+1)*two_n]
                             r_orig = r[:,:8]
-                            r_new_w1 = r[:,8]
-                            r_new_w2 = r[:,9]
+                            r_new_w1 = r[:,8:9]
+                            r_new_w2 = r[:,9:10]
 
                             inputs, prompts = prepare_inputs_and_prompts(r_orig, r_new_w1, r_new_w2)
                             outputs = soup_model.generate(inputs, prompts) 
-                            pred_seq += translate_output(outputs)
+                            pred_seq += translate_output(outputs, data_handler)
 
                         sim_results = eval_solutions(pred_seq)
                         obj_set = find_obj_pairs(sim_results, req, s)
@@ -1377,16 +1386,16 @@ if __name__ == "__main__":
                         for j in range(len(three_w1)):
                             soup_model_name = f"soup_{s1}_{three_w1[j]}_{s2}_{three_w2[j]}_{s3}_{three_w3[j]}.dict"
                             soup_model_path = os.path.join(config.checkpoint_path, "soup_models", soup_model_name)
-                            soup_model = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                            soup_model = GearFormerSoup(config, encoder=encoder, decoder=decoder, new_req_encoder_1=ObjEncoder(input_size=1, output_size=config.dim).to(device), new_req_encoder_2=ObjEncoder(input_size=1, output_size=config.dim).to(device), device=device)
                             soup_model.load_state_dict(torch.load(os.path.join(config.checkpoint_path, soup_model_path), map_location=device))
 
                             r = req[three_n[j]:three_n[j+1]]
                             r_orig = r[:,:8]
-                            r_new = req[:,9]
+                            r_new = r[:,9:10]
 
                             inputs, prompts = prepare_inputs_and_prompts(r_orig, r_new)
-                            outputs = soup_model.generate(inputs, prompts) 
-                            pred_seq += translate_output(outputs)
+                            outputs = soup_model.generate(inputs, prompts)
+                            pred_seq += translate_output(outputs, data_handler)
 
                         sim_results = eval_solutions(pred_seq)
                         obj_set = find_obj_triples(sim_results, req, s)
@@ -1404,16 +1413,16 @@ if __name__ == "__main__":
                         for j in range(len(three_w1)):
                             soup_model_name = f"soup_{s1}_{three_w1[j]}_{s2}_{three_w2[j]}_{s3}_{three_w3[j]}.dict"
                             soup_model_path = os.path.join(config.checkpoint_path, "soup_models", soup_model_name)
-                            soup_model = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                            soup_model = GearFormerSoup(config, encoder=encoder, decoder=decoder, new_req_encoder_1=ObjEncoder(input_size=1, output_size=config.dim).to(device), new_req_encoder_2=ObjEncoder(input_size=1, output_size=config.dim).to(device), device=device)
                             soup_model.load_state_dict(torch.load(os.path.join(config.checkpoint_path, soup_model_path), map_location=device))
 
                             r = req[three_n[j]:three_n[j+1]]
                             r_orig = r[:,:8]
-                            r_new = req[:,8]
+                            r_new = r[:,8:9]
 
                             inputs, prompts = prepare_inputs_and_prompts(r_orig, r_new)
-                            outputs = soup_model.generate(inputs, prompts) 
-                            pred_seq += translate_output(outputs)
+                            outputs = soup_model.generate(inputs, prompts)
+                            pred_seq += translate_output(outputs, data_handler)
 
                         sim_results = eval_solutions(pred_seq)
                         obj_set = find_obj_triples(sim_results, req, s)
@@ -1431,17 +1440,17 @@ if __name__ == "__main__":
                         for j in range(len(three_w1)):
                             soup_model_name = f"soup_{s1}_{three_w1[j]}_{s2}_{three_w2[j]}_{s3}_{three_w3[j]}.dict"
                             soup_model_path = os.path.join(config.checkpoint_path, "soup_models", soup_model_name)
-                            soup_model = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                            soup_model = GearFormerSoup(config, encoder=encoder, decoder=decoder, new_req_encoder_1=ObjEncoder(input_size=1, output_size=config.dim).to(device), new_req_encoder_2=ObjEncoder(input_size=1, output_size=config.dim).to(device), device=device)
                             soup_model.load_state_dict(torch.load(os.path.join(config.checkpoint_path, soup_model_path), map_location=device))
 
                             r = req[three_n[j]:three_n[j+1]]
                             r_orig = r[:,:8]
-                            r_new_w1 = req[:,9]
-                            r_new_w2 = req[:,8]
+                            r_new_w1 = r[:,9:10]
+                            r_new_w2 = r[:,8:9]
 
                             inputs, prompts = prepare_inputs_and_prompts(r_orig, r_new_w1, r_new_w2)
-                            outputs = soup_model.generate(inputs, prompts) 
-                            pred_seq += translate_output(outputs)
+                            outputs = soup_model.generate(inputs, prompts)
+                            pred_seq += translate_output(outputs, data_handler)
 
                         sim_results = eval_solutions(pred_seq)
                         obj_set = find_obj_triples(sim_results, req, s)
@@ -1459,17 +1468,17 @@ if __name__ == "__main__":
                         for j in range(len(three_w1)):
                             soup_model_name = f"soup_{s1}_{three_w1[j]}_{s2}_{three_w2[j]}_{s3}_{three_w3[j]}.dict"
                             soup_model_path = os.path.join(config.checkpoint_path, "soup_models", soup_model_name)
-                            soup_model = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=new_req_encoder, device=device)
+                            soup_model = GearFormerSoup(config, encoder=encoder, decoder=decoder, new_req_encoder_1=ObjEncoder(input_size=1, output_size=config.dim).to(device), new_req_encoder_2=ObjEncoder(input_size=1, output_size=config.dim).to(device), device=device)
                             soup_model.load_state_dict(torch.load(os.path.join(config.checkpoint_path, soup_model_path), map_location=device))
 
                             r = req[three_n[j]:three_n[j+1]]
                             r_orig = r[:,:8]
-                            r_new_w1 = req[:,8]
-                            r_new_w2 = req[:,9]
+                            r_new_w1 = r[:,8:9]
+                            r_new_w2 = r[:,9:10]
 
                             inputs, prompts = prepare_inputs_and_prompts(r_orig, r_new_w1, r_new_w2)
-                            outputs = soup_model.generate(inputs, prompts) 
-                            pred_seq += translate_output(outputs)
+                            outputs = soup_model.generate(inputs, prompts)
+                            pred_seq += translate_output(outputs, data_handler)
 
                         sim_results = eval_solutions(pred_seq)
                         obj_set = find_obj_triples(sim_results, req, s)
@@ -1478,6 +1487,7 @@ if __name__ == "__main__":
                         num_pareto.append(len(pareto_points))
                         pareto.append(pareto_points)
 
+                
                 print(datetime.now().strftime("%H:%M:%S"))
                 print()
 
@@ -1502,50 +1512,28 @@ if __name__ == "__main__":
                 num_pareto = []
                 pareto = []
 
-                encoder_path = "/app/train_models/models/GearFormer_0.0001_18_encoder.dict"
-                obj_encoder_path = "/app/train_models/models/SFT_ric_obj_encoder.dict"
-                w_encoder_path = "/app/train_models/models/SFT_ric_w_encoder.dict"
-                decoder_path = "/app/train_models/models/SFT_ric_decoder.dict"
+                ric_new_req_encoder = ObjEncoder(input_size=2, output_size=config.dim).to(device)
+                ric_model = GearFormerSimFT(config, encoder=encoder, decoder=decoder, new_req_encoder=ric_new_req_encoder, weight_encoder=weight_encoder, ric=True, device=device)
+                ric_model.load_state_dict(torch.load(os.path.join(config.checkpoint_path, "ric.dict"), map_location=device))
 
-                gfm = GFModel_w(encoder_path, decoder_path, obj_encoder_path, w_encoder_path)
+                ric_weights_map = {
+                    "speed_pos":       config.ric_speed_pos_weights,
+                    "speed_price":     config.ric_speed_price_weights,
+                    "speed_bb":        config.ric_speed_bb_weights,
+                    "pos_price":       config.ric_pos_price_weights,
+                    "pos_bb":          config.ric_pos_bb_weights,
+                    "price_bb":        config.ric_price_bb_weights,
+                    "speed_pos_bb":    config.ric_speed_pos_bb_weights,
+                    "speed_pos_price": config.ric_speed_pos_price_weights,
+                    "speed_bb_price":  config.ric_speed_bb_price_weights,
+                    "pos_price_bb":    config.ric_pos_price_bb_weights,
+                }
+                w = np.array(ric_weights_map[s]).reshape(-1, 4).tolist()
 
-                if s == "speed_pos":
-                    w = [[1, 0, 0, 0], [0, 1, 0, 0], [1, 1, 0, 0]]
-                elif s == "speed_price":
-                    w = [[1, 0, 0, 0], [0, 0, 1, 0], [1, 0, 1, 0]]
-                elif s == "speed_bb":
-                    w = [[1, 0, 0, 0], [0, 0, 0, 1], [1, 0, 0, 1]]
-                elif s == "pos_price":
-                    w = [[0, 1, 0, 0], [0, 0, 1, 0], [0, 1, 1, 0]]
-                elif s == "pos_bb":
-                    w = [[0, 1, 0, 0], [0, 0, 0, 1], [0, 1, 0, 1]]
-                elif s == "price_bb":
-                    w = [[0, 0, 1, 0], [0, 0, 0, 1], [0, 0, 1, 1]]
-                if s == "speed_pos_bb":
-                    w = [[1, 0, 0 ,0], [1, 1, 0, 0], [1, 0, 0, 1], [0, 1, 0, 1], [0, 0, 0, 1], [0, 1, 0, 0], [1, 1, 0, 1]]
-                elif s == "speed_pos_price":
-                    w = [[1, 0, 0 ,0], [0, 1, 0, 0], [0, 0, 1, 0], [1, 1, 0, 0], [1, 0, 1, 0], [0, 1, 1, 0], [1, 1, 1, 0]]
-                elif s == "speed_bb_price":
-                    w = [[1, 0, 0 ,0], [0, 0, 1, 0], [0, 0, 0, 1], [1, 0, 1, 0], [1, 0, 0, 1], [0, 0, 1, 1], [1, 0, 1, 1]]
-                elif s == "pos_price_bb":
-                    w = [[0, 1, 0 ,0], [0, 0, 1, 0], [0, 0, 0, 1], [0, 1, 1, 0], [0, 1, 0, 1], [0, 0, 1, 1], [0, 1, 1, 1]]
-
-
-            
                 if num_scenarios == 2:
-                    if args.N == 30:
-                        n = [0, 10, 20, 30]
-                    elif args.N == 300:
-                        n = [0, 100, 200, 300]
-                    else:
-                        n = np.linspace(0, N, 4).tolist()
+                    n = [int(x) for x in np.linspace(0, N, config.ric_2reqs_n_splits + 1)]
                 else:
-                    if args.N == 30:
-                        n = [0, 4, 8, 12, 16, 20, 24, 30]
-                    elif args.N == 300:
-                        n = [0, 40, 80, 120, 160, 200, 240, 300]
-                    else:
-                        n = np.linspace(0, N, 8).tolist()
+                    n = [int(x) for x in np.linspace(0, N, config.ric_3reqs_n_splits + 1)]
 
                 for i in range(0, num_tests):
                     print(i)
@@ -1553,12 +1541,16 @@ if __name__ == "__main__":
                     pred_seq = []
 
                     for j in range(len(w)):
-                        gfm = GFModel_w(encoder_path, decoder_path, obj_encoder_path, w_encoder_path)
                         r = req[n[j]:n[j+1]]
                         r_orig = r[:,:8]
-                        r_new = r[:,8:10]
-                        pred_seq += gfm.run(r_orig, r_new, [w[j]] * (n[j+1]-n[j]))
-                   
+                        r_new_1 = r[:,8:9]
+                        r_new_2 = r[:,9:10]
+                        weights = [w[j]] * (n[j+1]-n[j])
+
+                        inputs, prompts = prepare_inputs_and_prompts(r_orig, new_reqs_1=r_new_1, new_reqs_2=r_new_2, weights=weights)
+                        outputs = ric_model.generate(inputs, prompts) 
+                        pred_seq += translate_output(outputs, data_handler)
+
                     sim_results = eval_solutions(pred_seq)
                     if num_scenarios == 2:
                         obj_set = find_obj_pairs(sim_results, req, s)
@@ -1569,6 +1561,7 @@ if __name__ == "__main__":
                     num_pareto.append(len(pareto_points))
                     pareto.append(pareto_points)
 
+                
                 print(datetime.now().strftime("%H:%M:%S"))
                 print()
 

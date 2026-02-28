@@ -32,12 +32,12 @@ class GearFormerSoup(nn.Module):
         req_input = inputs[0].to(self.device)
         encoded_input = self.encoder(req_input)
 
-        if self.new_req_encoder_1 is not None:
+        if self.new_req_encoder_1 is not None and inputs[1] is not None:
             new_req_list = inputs[1][:,0].unsqueeze(-1).to(self.device)
             encoded_new_req = self.new_req_encoder_1(new_req_list)
             encoded_input += encoded_new_req.unsqueeze(1)
 
-        if self.new_req_encoder_2 is not None:
+        if self.new_req_encoder_2 is not None and inputs[2] is not None:
             new_req_list = inputs[2][:,0].unsqueeze(-1).to(self.device)
             encoded_new_req = self.new_req_encoder_2(new_req_list)
             encoded_input += encoded_new_req.unsqueeze(1)
@@ -53,12 +53,12 @@ class GearFormerSoup(nn.Module):
         req_input = inputs[0].to(self.device)
         encoded_input = self.encoder(req_input)
 
-        if self.new_req_encoder_1 is not None:
+        if self.new_req_encoder_1 is not None and inputs[1] is not None:
             new_req_list = inputs[1][:,0].unsqueeze(-1).to(self.device)
             encoded_new_req = self.new_req_encoder_1(new_req_list)
             encoded_input += encoded_new_req.unsqueeze(1)
 
-        if self.new_req_encoder_2 is not None:
+        if self.new_req_encoder_2 is not None and inputs[2] is not None:
             new_req_list = inputs[2][:,0].unsqueeze(-1).to(self.device)
             encoded_new_req = self.new_req_encoder_2(new_req_list)
             encoded_input += encoded_new_req.unsqueeze(1)
